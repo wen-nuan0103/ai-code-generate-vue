@@ -8,13 +8,19 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AAvatar: typeof import('ant-design-vue/es')['Avatar']
     AButton: typeof import('ant-design-vue/es')['Button']
     AConfigProvider: typeof import('ant-design-vue/es')['ConfigProvider']
+    AForm: typeof import('ant-design-vue/es')['Form']
+    AFormItem: typeof import('ant-design-vue/es')['FormItem']
+    AInput: typeof import('ant-design-vue/es')['Input']
+    AInputPassword: typeof import('ant-design-vue/es')['InputPassword']
     ALayout: typeof import('ant-design-vue/es')['Layout']
     ALayoutContent: typeof import('ant-design-vue/es')['LayoutContent']
     ALayoutFooter: typeof import('ant-design-vue/es')['LayoutFooter']
     ALayoutHeader: typeof import('ant-design-vue/es')['LayoutHeader']
     AMenu: typeof import('ant-design-vue/es')['Menu']
+    ASpace: typeof import('ant-design-vue/es')['Space']
     GlobalFooter: typeof import('./src/components/GlobalFooter.vue')['default']
     GlobalHeader: typeof import('./src/components/GlobalHeader.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']

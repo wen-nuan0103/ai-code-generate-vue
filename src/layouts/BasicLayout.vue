@@ -30,39 +30,31 @@ import GlobalFooter from '@/components/GlobalFooter.vue'
 .content {
   flex: 1;
   background: #f0f2f5;
-  padding: 24px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .content-wrapper {
-  max-width: 1400px;
-  margin: 0 auto;
+  flex: 1;
+  display: flex;
+  width: 100%;
   background: #fff;
   padding: 24px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  min-height: calc(100vh - 240px);
+  box-sizing: border-box;
+  overflow: auto;
 }
 
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .content {
-    padding: 16px;
-  }
-
   .content-wrapper {
     padding: 16px;
-    min-height: calc(100vh - 220px);
   }
 }
 
 @media (max-width: 576px) {
-  .content {
-    padding: 12px;
-  }
-
   .content-wrapper {
     padding: 12px;
-    border-radius: 4px;
   }
 }
 </style>

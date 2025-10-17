@@ -4,12 +4,12 @@ import dayjs from 'dayjs';
 import 'dayjs/locale/zh-cn';
 dayjs.locale('zh-cn');
 import BasicLayout from './layouts/BasicLayout.vue'
-import { health } from './api/healthController';
 const locale = zhCN
 
-health().then((result) => {
-  console.log(result);
-})
+import { useUserStore } from '@/stores/user.ts'
+
+const userStore = useUserStore()
+userStore.fetchLoginUser()
 </script>
 
 <template>

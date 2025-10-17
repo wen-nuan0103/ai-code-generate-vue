@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useUserStore } from '@/stores/user'
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -9,6 +10,7 @@ const menuItems = ref([
 ])
 
 const router = useRouter()
+const userStore = useUserStore()
 
 // 处理菜单点击
 const handleMenuClick = ({ key }: { key: string }) => {
@@ -25,7 +27,17 @@ const handleMenuClick = ({ key }: { key: string }) => {
       </div>
       <a-menu mode="horizontal" :items="menuItems" class="menu" @click="handleMenuClick" />
       <div class="user-section">
-        <a-button type="primary">登录</a-button>
+        <div class="user-login-status">
+          <div v-if="userStore.user.id">
+            <a-space>
+              <a-avatar :src="userStore.user.avatar" />
+              {{ userStore.user.userName ?? '无名' }}
+            </a-space>
+          </div>
+          <div v-else>
+            <a-button type="primary" href="/user/login">登录</a-button>
+          </div>
+        </div>
       </div>
     </div>
   </a-layout-header>
