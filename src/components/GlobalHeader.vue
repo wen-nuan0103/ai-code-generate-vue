@@ -1,20 +1,64 @@
 <script setup lang="ts">
 import { useUserStore } from '@/stores/user'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { LogoutOutlined } from '@ant-design/icons-vue'
+import { logout } from '@/api/userController'
+import { message } from 'ant-design-vue'
+import checkAccess from '@/access/checkAccess'
 
 // 菜单配置项
 const menuItems = ref([
   { key: '/', label: '首页' },
+  { key: '/admin/userManage', label: '用户管理' },
   { key: '/about', label: '关于' },
 ])
 
 const router = useRouter()
+const allRoutes = router.getRoutes()
+// console.log(allRoutes);
 const userStore = useUserStore()
+
+
 
 // 处理菜单点击
 const handleMenuClick = ({ key }: { key: string }) => {
   router.push(key)
+}
+
+// 将菜单项转换为路由菜单
+const menuToRouteItem = ((menu: any) => {
+  const route = allRoutes.find(it => it.path === menu.key)
+  return {
+    path: route?.path,
+    meta: route?.meta
+  }
+})
+
+// 过滤菜单项
+const items = computed(() => {
+  return menuItems.value.filter((menu) => {
+    const item = menuToRouteItem(menu);
+    if (item.meta?.hideInMenu) {
+      return false;
+    }
+    // 根据权限过滤菜单，有权限则返回 true，则保留该菜单
+    return checkAccess(userStore.user, item.meta?.access as string);
+  })
+})
+
+
+const handleLogout = async () => {
+  const result = await logout()
+  if (result.data.code === 0) {
+    userStore.setUser({
+      userName: '未登录'
+    })
+    message.success("退出登录成功")
+    await router.push("/user/login")
+  } else {
+    message.error(`退出登录失败: ${result.data.message}`)
+  }
 }
 </script>
 
@@ -25,14 +69,24 @@ const handleMenuClick = ({ key }: { key: string }) => {
         <img src="@/assets/logo.svg" alt="logo" class="logo" />
         <span class="title">AI 代码生成平台</span>
       </div>
-      <a-menu mode="horizontal" :items="menuItems" class="menu" @click="handleMenuClick" />
+      <a-menu mode="horizontal" :items="items" class="menu" @click="handleMenuClick" />
       <div class="user-section">
         <div class="user-login-status">
           <div v-if="userStore.user.id">
-            <a-space>
-              <a-avatar :src="userStore.user.avatar" />
-              {{ userStore.user.userName ?? '无名' }}
-            </a-space>
+            <a-dropdown>
+              <a-space>
+                <a-avatar :src="userStore.user.avatar" />
+                {{ userStore.user.userName ?? '无名' }}
+              </a-space>
+              <template #overlay>
+                <a-menu>
+                  <a-menu-item @click="handleLogout">
+                    <LogoutOutlined />
+                    退出登录
+                  </a-menu-item>
+                </a-menu>
+              </template>
+            </a-dropdown>
           </div>
           <div v-else>
             <a-button type="primary" href="/user/login">登录</a-button>

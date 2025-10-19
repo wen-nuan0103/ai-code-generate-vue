@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '@/pages/HomeView.vue'
+import ACCESS_ENUM from '@/access/accessEnum'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -19,6 +20,14 @@ const router = createRouter({
       name: 'user_register',
       component: () => import('@/pages/user/UserRegisterPage.vue')
     },
+    {
+      path:"/admin/userManage",
+      name:"user_manage",
+      component: () => import('@/pages/admin/UserManagePage.vue'),
+      meta:{
+        access:ACCESS_ENUM.ADMIN
+      }
+    }
   ],
 })
 

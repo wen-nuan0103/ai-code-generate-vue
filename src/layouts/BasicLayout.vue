@@ -38,6 +38,7 @@ import GlobalFooter from '@/components/GlobalFooter.vue'
 .content-wrapper {
   flex: 1;
   display: flex;
+  justify-content: center;
   width: 100%;
   background: #fff;
   padding: 24px;
