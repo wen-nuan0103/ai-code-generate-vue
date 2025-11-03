@@ -22,28 +22,20 @@ import GlobalFooter from '@/components/GlobalFooter.vue'
 
 <style scoped>
 .basic-layout {
+  background: none;
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
 }
 
 .content {
-  flex: 1;
-  background: #f0f2f5;
+  width: 100%;
   padding: 0;
-  display: flex;
-  flex-direction: column;
+  background: none;
+  margin: 0;
+  padding-top: 64px; /* 为固定的导航头留出空间 */
 }
 
 .content-wrapper {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  width: 100%;
-  background: #fff;
-  padding: 24px;
-  box-sizing: border-box;
-  overflow: auto;
+  min-height: calc(100vh - 64px);
 }
 
 /* 响应式设计 */

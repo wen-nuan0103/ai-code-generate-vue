@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useUserStore } from '@/stores/user'
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { LogoutOutlined } from '@ant-design/icons-vue'
 import { logout } from '@/api/userController'
@@ -9,9 +9,8 @@ import checkAccess from '@/access/checkAccess'
 
 // 菜单配置项
 const menuItems = ref([
-  { key: '/', label: '首页' },
-  { key: '/admin/userManage', label: '用户管理' },
-  { key: '/about', label: '关于' },
+  { key: '/', label: '使用文档' },
+  { key: '/community', label: '交流社区' },
 ])
 
 const router = useRouter()
@@ -19,7 +18,14 @@ const allRoutes = router.getRoutes()
 // console.log(allRoutes);
 const userStore = useUserStore()
 
+// 滚动状态
+const scrolled = ref(false)
 
+// 处理滚动事件
+const handleScroll = () => {
+  const scrollTop = window.pageYOffset || document.documentElement.scrollTop
+  scrolled.value = scrollTop > 50
+}
 
 // 处理菜单点击
 const handleMenuClick = ({ key }: { key: string }) => {
@@ -27,56 +33,65 @@ const handleMenuClick = ({ key }: { key: string }) => {
 }
 
 // 将菜单项转换为路由菜单
-const menuToRouteItem = ((menu: any) => {
-  const route = allRoutes.find(it => it.path === menu.key)
+const menuToRouteItem = (menu: any) => {
+  const route = allRoutes.find((it) => it.path === menu.key)
   return {
     path: route?.path,
-    meta: route?.meta
+    meta: route?.meta,
   }
-})
+}
 
 // 过滤菜单项
 const items = computed(() => {
   return menuItems.value.filter((menu) => {
-    const item = menuToRouteItem(menu);
+    const item = menuToRouteItem(menu)
     if (item.meta?.hideInMenu) {
-      return false;
+      return false
     }
     // 根据权限过滤菜单，有权限则返回 true，则保留该菜单
-    return checkAccess(userStore.user, item.meta?.access as string);
+    return checkAccess(userStore.user, item.meta?.access as string)
   })
 })
-
 
 const handleLogout = async () => {
   const result = await logout()
   if (result.data.code === 0) {
     userStore.setUser({
-      userName: '未登录'
+      userName: '未登录',
     })
-    message.success("退出登录成功")
-    await router.push("/user/login")
+    message.success('退出登录成功')
+    await router.push('/user/login')
   } else {
     message.error(`退出登录失败: ${result.data.message}`)
   }
 }
+
+// // 生命周期
+// onMounted(() => {
+//   window.addEventListener('scroll', handleScroll)
+//   handleScroll() // 初始化状态
+// })
+
+// onUnmounted(() => {
+//   window.removeEventListener('scroll', handleScroll)
+// })
 </script>
 
 <template>
-  <a-layout-header class="header">
+  <a-layout-header class="header" :class="{ 'header-scrolled': scrolled }">
     <div class="header-content">
-      <div class="logo-section">
-        <img src="@/assets/logo.svg" alt="logo" class="logo" />
-        <span class="title">AI 代码生成平台</span>
+      <div class="logo-section" @click="() => router.push('/')">
+        <!-- <img src="@/assets/logo.svg" alt="logo" class="logo" /> -->
+        <span class="title">NoCode</span>
       </div>
       <a-menu mode="horizontal" :items="items" class="menu" @click="handleMenuClick" />
       <div class="user-section">
         <div class="user-login-status">
           <div v-if="userStore.user.id">
             <a-dropdown>
-              <a-space>
-                <a-avatar :src="userStore.user.avatar" />
-                {{ userStore.user.userName ?? '无名' }}
+              <a-space class="user-info">
+                <a-avatar :src="userStore.user.avatar" style="width: 48px;height: 48px;"/>
+                <!-- <span class="user-name">{{ userStore.user.userName ?? '无名' }}</span> -->
               </a-space>
               <template #overlay>
                 <a-menu>
@@ -89,7 +104,10 @@ const handleLogout = async () => {
             </a-dropdown>
           </div>
           <div v-else>
-            <a-button type="primary" href="/user/login">登录</a-button>
+            <button class="login-btn" @click="router.push('/user/login')">
+              <span>登录</span>
+            </button>
+            <!-- <a-button type="primary" href="/user/login" class="login-btn">登录</a-button> -->
           </div>
         </div>
       </div>
@@ -99,13 +117,26 @@ const handleLogout = async () => {
 
 <style scoped>
 .header {
-  background: #fff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  padding: 0;
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 100;
+  left: 0;
+  right: 0;
+  background: rgba(248, 249, 245, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: none;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  z-index: 1000;
+  transition: all 0.3s ease;
 }
+
+/* .header-scrolled {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(30px);
+  box-shadow: 0 2px 20px rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+} */
+ 
 
 .header-content {
   max-width: 1400px;
@@ -113,8 +144,12 @@ const handleLogout = async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
-  height: 64px;
+  padding: 0 40px;
+  height: 80px;
+}
+
+.ant-layout .ant-layout-header {
+  height: 80px !important;
 }
 
 .logo-section {
@@ -122,18 +157,26 @@ const handleLogout = async () => {
   align-items: center;
   gap: 12px;
   flex-shrink: 0;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.logo-section:hover {
+  opacity: 0.8;
 }
 
 .logo {
-  height: 40px;
-  width: 40px;
+  height: 36px;
+  width: 36px;
+  transition: all 0.3s;
 }
 
 .title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #1890ff;
+  font-size: 20px;
+  font-weight: 700;
+  color: #1e293b;
   white-space: nowrap;
+  letter-spacing: -0.5px;
 }
 
 .menu {
@@ -141,7 +184,8 @@ const handleLogout = async () => {
   min-width: 0;
   border-bottom: none;
   line-height: 64px;
-  margin: 0 24px;
+  margin: 0 40px;
+  background: transparent;
 }
 
 .user-section {
@@ -151,18 +195,55 @@ const handleLogout = async () => {
   flex-shrink: 0;
 }
 
+.user-info {
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.user-info:hover {
+  opacity: 0.8;
+}
+
+.user-name {
+  color: #1e293b;
+  font-weight: 500;
+}
+
+.login-btn {
+  background-color: black;
+  color: white;
+  border: none;
+  text-align: center;
+  padding: 4px 24px;
+  width: 85px;
+  height: 40px;
+  font-weight: 500;
+  transition: all 0.3s;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.login-btn span {
+  font-size: medium;
+}
+
+/* .login-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
+} */
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .header-content {
-    padding: 0 16px;
+    padding: 0 20px;
   }
 
   .title {
-    display: none;
+    font-size: 16px;
   }
 
   .menu {
-    margin: 0 12px;
+    margin: 0 16px;
   }
 
   .logo {
@@ -172,9 +253,18 @@ const handleLogout = async () => {
 }
 
 @media (max-width: 576px) {
+  .header-content {
+    padding: 0 16px;
+  }
+
   .menu {
     flex: 0;
     min-width: auto;
+    margin: 0 8px;
+  }
+
+  .user-name {
+    display: none;
   }
 }
 </style>
