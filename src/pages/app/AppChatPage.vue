@@ -1,31 +1,85 @@
 <template>
   <div id="appChatPage">
-    <!-- 顶部栏 -->
-    <div class="header-bar">
+    <!-- 自定义头部区域 -->
+    <div class="custom-header">
+      <!-- 左侧：用户头像 + 项目名称 + 下拉箭头 -->
       <div class="header-left">
-        <h1 class="app-name">{{ appInfo?.appName || '网站生成器' }}</h1>
+        <a-avatar :src="userStore.user.avatar" :size="36" />
+        <div class="project-name-container">
+          <span class="project-name">{{ appInfo?.appName || '未命名项目' }}</span>
+          <a-dropdown>
+            <template #overlay>
+              <a-menu>
+                <a-menu-item key="detail" @click="showAppDetail">
+                  <InfoCircleOutlined />
+                  <span>应用详情</span>
+                </a-menu-item>
+                <a-menu-item v-if="isOwner || isAdmin" key="edit" @click="editApp">
+                  <EditOutlined />
+                  <span>编辑应用</span>
+                </a-menu-item>
+                <a-menu-divider v-if="isOwner || isAdmin" />
+                <a-menu-item v-if="isOwner || isAdmin" key="delete" @click="deleteApp" danger>
+                  <DeleteOutlined />
+                  <span>删除应用</span>
+                </a-menu-item>
+              </a-menu>
+            </template>
+            <i class="ri-arrow-down-s-line"></i>
+          </a-dropdown>
+        </div>
       </div>
+
+      <!-- 中间：功能按钮组 -->
+      <div class="header-center">
+        <div class="tab-buttons">
+          <a-button class="tab-button" :type="activeTab === 'display' ? 'primary' : 'default'"
+            @click="activeTab = 'display'">
+            <i class="ri-window-line"></i>
+          </a-button>
+          <a-button class="tab-button" :type="activeTab === 'code' ? 'primary' : 'default'" @click="activeTab = 'code'">
+            <i class="ri-code-s-slash-line"></i>
+          </a-button>
+          <a-button class="tab-button" :type="activeTab === 'settings' ? 'primary' : 'default'"
+            @click="activeTab = 'settings'">
+            <i class="ri-settings-5-line"></i>
+          </a-button>
+        </div>
+
+        <!-- 功能按钮区域（仅在"显示"标签时显示） -->
+        <div class="action-buttons" :class="{ 'hidden-placeholder': activeTab !== 'display' }">
+          <a-button class="tab-button" v-for="btn in actionButtons" :key="btn.key" @click="btn.handler" :loading="btn.loading">
+            <a-tooltip placement="bottom">
+              <template #title>
+                {{ btn.label }}
+              </template>
+              <i :class="btn.icon"></i>
+            </a-tooltip>
+
+            <!-- {{ btn.label }} -->
+          </a-button>
+        </div>
+      </div>
+
+      <!-- 右侧：下载 + 部署按钮 -->
       <div class="header-right">
-        <a-button type="default" @click="showAppDetail">
+        <a-button @click="downloadApp">
           <template #icon>
-            <InfoCircleOutlined />
+            <DownloadOutlined />
           </template>
-          应用详情
         </a-button>
-        <a-button type="primary" @click="deployApp" :loading="deploying">
-          <template #icon>
-            <CloudUploadOutlined />
-          </template>
-          部署按钮
+        <a-button class="deploy-button" @click="deployApp" :loading="deploying">
+          <i class="ri-rocket-line"></i>
+          部署
         </a-button>
       </div>
     </div>
 
     <!-- 主要内容区域 -->
     <div class="main-content">
-      <!-- 左侧对话区域 -->
+      <!-- 左侧：聊天区域 -->
       <div class="chat-section">
-        <!-- 消息区域 -->
+        <!-- 消息区域（可滚动） -->
         <div class="messages-container" ref="messagesContainer">
           <div v-for="(message, index) in messages" :key="index" class="message-item">
             <div v-if="message.type === 'user'" class="user-message">
@@ -49,17 +103,17 @@
           </div>
         </div>
 
-        <!-- 用户消息输入框 -->
+        <!-- 底部输入框 -->
         <div class="input-container">
           <div class="input-wrapper">
             <a-tooltip v-if="!isOwner" title="无法在别人的作品下对话哦~" placement="top">
-              <a-textarea v-model:value="userInput" placeholder="请描述你想生成的网站，越详细效果越好哦" :rows="4" :maxlength="1000"
+              <a-textarea class="chat-content" v-model:value="userInput" placeholder="请描述你想生成的网站，越详细效果越好哦" :rows="4" :maxlength="1000"
                 @keydown.enter.prevent="sendMessage" :disabled="isGenerating || !isOwner" />
             </a-tooltip>
-            <a-textarea v-else v-model:value="userInput" placeholder="请描述你想生成的网站，越详细效果越好哦" :rows="4" :maxlength="1000"
+            <a-textarea class="chat-content" v-else v-model:value="userInput" placeholder="请描述你想生成的网站，越详细效果越好哦" :rows="4" :maxlength="1000"
               @keydown.enter.prevent="sendMessage" :disabled="isGenerating" />
             <div class="input-actions">
-              <a-button type="primary" @click="sendMessage" :loading="isGenerating" :disabled="!isOwner">
+              <a-button class="sent-message-btn" type="primary" @click="sendMessage" :loading="isGenerating" :disabled="!isOwner">
                 <template #icon>
                   <SendOutlined />
                 </template>
@@ -69,20 +123,10 @@
         </div>
       </div>
 
-      <!-- 右侧网页展示区域 -->
-      <div class="preview-section">
-        <div class="preview-header">
-          <h3>生成后的网页展示</h3>
-          <div class="preview-actions">
-            <a-button v-if="previewUrl" type="link" @click="openInNewTab">
-              <template #icon>
-                <ExportOutlined />
-              </template>
-              新窗口打开
-            </a-button>
-          </div>
-        </div>
-        <div class="preview-content">
+      <!-- 右侧：内容展示区域（根据选中的标签切换） -->
+      <div class="content-section">
+        <!-- 显示标签内容 -->
+        <div v-if="activeTab === 'display'" class="tab-content display-content">
           <div v-if="!previewUrl && !isGenerating" class="preview-placeholder">
             <div class="placeholder-icon">🌐</div>
             <p>网站文件生成完成后将在这里展示</p>
@@ -92,6 +136,22 @@
             <p>正在生成网站...</p>
           </div>
           <iframe v-else :src="previewUrl" class="preview-iframe" frameborder="0" @load="onIframeLoad"></iframe>
+        </div>
+
+        <!-- 代码标签内容 -->
+        <div v-else-if="activeTab === 'code'" class="tab-content code-content">
+          <div class="code-placeholder">
+            <div class="placeholder-icon">📝</div>
+            <p>代码展示区域（预留后端数据注入）</p>
+          </div>
+        </div>
+
+        <!-- 设置标签内容 -->
+        <div v-else-if="activeTab === 'settings'" class="tab-content settings-content">
+          <div class="settings-placeholder">
+            <div class="placeholder-icon">⚙️</div>
+            <p>设置区域（预留后端数据注入）</p>
+          </div>
         </div>
       </div>
     </div>
@@ -129,6 +189,12 @@ import {
   SendOutlined,
   ExportOutlined,
   InfoCircleOutlined,
+  DownOutlined,
+  EditOutlined,
+  DeleteOutlined,
+  EyeOutlined,
+  ReloadOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons-vue'
 
 const route = useRoute()
@@ -138,6 +204,9 @@ const userStore = useUserStore()
 // 应用信息
 const appInfo = ref<API.AppVO>()
 const appId = ref<string>()
+
+// 标签切换状态
+const activeTab = ref<'display' | 'code' | 'settings'>('display')
 
 // 对话相关
 interface Message {
@@ -172,6 +241,31 @@ const isAdmin = computed(() => {
 
 // 应用详情相关
 const appDetailVisible = ref(false)
+
+// 头部功能按钮配置（仅在"显示"标签时显示，方便后期修改）
+const actionButtons = ref([
+  {
+    key: 'showAll',
+    label: '全部显示',
+    icon: 'ri-fullscreen-line',
+    handler: () => showAllContent(),
+    loading: false,
+  },
+  {
+    key: 'refresh',
+    label: '刷新',
+    icon: 'ri-refresh-line',
+    handler: () => refreshPreview(),
+    loading: false,
+  },
+  {
+    key: 'openNew',
+    label: '新窗口打开',
+    icon: 'ri-send-plane-line',
+    handler: () => openInNewTab(),
+    loading: false,
+  },
+])
 
 // 显示应用详情
 const showAppDetail = () => {
@@ -457,6 +551,26 @@ const deleteApp = async () => {
   }
 }
 
+// 全部显示功能
+const showAllContent = () => {
+  message.info('全部显示功能（预留）')
+}
+
+// 刷新预览
+const refreshPreview = () => {
+  if (previewUrl.value) {
+    updatePreview()
+    message.success('刷新成功')
+  } else {
+    message.warning('暂无可刷新的内容')
+  }
+}
+
+// 下载应用
+const downloadApp = () => {
+  message.info('下载功能（预留）')
+}
+
 // 页面加载时获取应用信息
 onMounted(() => {
   fetchAppInfo()
@@ -473,42 +587,127 @@ onUnmounted(() => {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  padding: 16px;
-  background: #fdfdfd;
+  background: #f5f5f5;
+  overflow: hidden;
 }
 
-/* 顶部栏 */
-.header-bar {
+/* 自定义头部区域 */
+.custom-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
+  padding: 12px 24px;
+  background: #ffffff;
+  /* border-bottom: 1px solid #e8e8e8;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06); */
+  z-index: 100;
 }
 
+/* 头部左侧 */
 .header-left {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-shrink: 0;
 }
 
-.app-name {
-  margin: 0;
-  font-size: 18px;
+.project-name-container {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.project-name {
+  font-size: 16px;
   font-weight: 600;
   color: #1a1a1a;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+/* 头部中间 */
+.header-center {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+  justify-content: center;
+}
+
+.tab-buttons {
+  display: flex;
+  background-color: #f5f5f5;
+  border-radius: 10px;
+  /* gap: 8px; */
+}
+
+ .tab-button {
+  padding: 4px 8px !important;
+  margin: 8px !important;
+  
+
+}
+
+.tab-button:nth-child(2) {
+  margin: 8px 0px !important;
+}
+
+.action-buttons {
+  display: flex;
+  /* gap: 8px;
+  margin-left: 16px; */
+  padding-left: 16px;
+  border-left: 1px solid #e8e8e8;
+
+}
+
+:where(.css-dev-only-do-not-override-1p3hq3p).tab-button.ant-btn-default {
+  background-color: #f5f5f5;
+  border-color: transparent;
+}
+
+
+/* 隐藏但保持空间占位 */
+.hidden-placeholder {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* 头部右侧 */
 .header-right {
   display: flex;
   gap: 12px;
+  flex-shrink: 0;
+}
+
+/* 部署按钮样式（黑色） */
+.deploy-button {
+  background-color: #1a1a1a;
+  border-color: #1a1a1a;
+  color: #ffffff;
+}
+
+.deploy-button:hover {
+  background-color: #333333;
+  border-color: #333333;
+  color: #ffffff;
+}
+
+.deploy-button:active,
+.deploy-button:focus {
+  background-color: #000000;
+  border-color: #000000;
+  color: #ffffff;
 }
 
 /* 主要内容区域 */
 .main-content {
   flex: 1;
   display: flex;
-  gap: 16px;
-  padding: 8px;
+  /* gap: 16px; */
+  /* padding: 16px; */
   overflow: hidden;
 }
 
@@ -519,7 +718,7 @@ onUnmounted(() => {
   flex-direction: column;
   background: white;
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   overflow: hidden;
 }
 
@@ -592,46 +791,58 @@ onUnmounted(() => {
   padding-right: 50px;
 }
 
+.chat-content {
+  background-color: #f5f5f5;
+  border-color: transparent;
+  border-radius: 15px;
+  resize: none;
+  width: 100%;
+  height: 120px;
+  min-height: 120px;
+  max-height: 120px;
+  overflow: auto;
+}
+
+.chat-content:hover {
+  border-color: transparent;
+}
+
 .input-actions {
   position: absolute;
   bottom: 8px;
   right: 8px;
 }
 
-/* 右侧预览区域 */
-.preview-section {
+.sent-message-btn {
+  border-color: transparent;
+}
+
+/* 右侧内容展示区域 */
+.content-section {
   flex: 3;
   display: flex;
   flex-direction: column;
   background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+
+  /* box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); */
+  padding: 16px;
+
   overflow: hidden;
 }
 
-.preview-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px;
-  border-bottom: 1px solid #e8e8e8;
-}
-
-.preview-header h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.preview-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.preview-content {
+/* 标签内容容器 */
+.tab-content {
   flex: 1;
   position: relative;
-  overflow: hidden;
+  overflow: auto;
+    border-radius: 8px;
+    border: 1px solid oklch(.928 .006 264.531);
+}
+
+/* 显示标签内容 */
+.display-content {
+  display: flex;
+  flex-direction: column;
 }
 
 .preview-placeholder {
@@ -640,12 +851,17 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #666;
+  color: #999;
 }
 
 .placeholder-icon {
-  font-size: 48px;
+  font-size: 64px;
   margin-bottom: 16px;
+}
+
+.preview-placeholder p {
+  font-size: 14px;
+  color: #999;
 }
 
 .preview-loading {
@@ -659,12 +875,42 @@ onUnmounted(() => {
 
 .preview-loading p {
   margin-top: 16px;
+  font-size: 14px;
 }
 
 .preview-iframe {
   width: 100%;
   height: 100%;
   border: none;
+}
+
+/* 代码标签内容 */
+.code-content {
+  padding: 16px;
+  /* background: #fafafa; */
+}
+
+.code-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #999;
+}
+
+/* 设置标签内容 */
+.settings-content {
+  padding: 24px;
+}
+
+.settings-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #999;
 }
 
 /* 响应式设计 */
@@ -674,19 +920,43 @@ onUnmounted(() => {
   }
 
   .chat-section,
-  .preview-section {
+  .content-section {
     flex: none;
     height: 50vh;
+  }
+
+  .header-center {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .action-buttons {
+    margin-left: 0;
+    padding-left: 0;
+    border-left: none;
   }
 }
 
 @media (max-width: 768px) {
-  .header-bar {
+  .custom-header {
+    flex-wrap: wrap;
     padding: 12px 16px;
+    gap: 8px;
   }
 
-  .app-name {
-    font-size: 16px;
+  .header-center {
+    order: 3;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .tab-buttons {
+    flex-wrap: wrap;
+  }
+
+  .project-name {
+    max-width: 120px;
+    font-size: 14px;
   }
 
   .main-content {
@@ -696,6 +966,10 @@ onUnmounted(() => {
 
   .message-content {
     max-width: 85%;
+  }
+
+  .header-right {
+    flex-wrap: wrap;
   }
 }
 </style>

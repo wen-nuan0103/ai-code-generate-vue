@@ -4,6 +4,7 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import "@/access/index";
+import "@/assets/remix_icon/remixicon.css"
 
 
 const app = createApp(App)

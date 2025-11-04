@@ -1,5 +1,5 @@
 <template>
-  <a-modal v-model:open="visible" title="应用详情" :footer="null" width="500px">
+  <a-modal v-model:open="visible" title="基础信息" :footer="null" width="500px">
     <div class="app-detail-content">
       <!-- 应用基础信息 -->
       <div class="app-basic-info">
@@ -9,7 +9,15 @@
         </div>
         <div class="info-item">
           <span class="info-label">创建时间：</span>
-          <span>{{ formatTime(app?.createTime) }}</span>
+          <p>{{ formatTime(app?.createTime) }}</p>
+        </div>
+        <div class="info-item">
+          <span class="info-label">公开至 [案例广场]：</span>
+          <p>{{ formatTime(app?.createTime) }}</p>
+        </div>
+        <div class="info-item">
+          <span class="info-label">查看对话：</span>
+          <p>{{ formatTime(app?.createTime) }}</p>
         </div>
       </div>
 
@@ -22,12 +30,7 @@
             </template>
             修改
           </a-button>
-          <a-popconfirm
-            title="确定要删除这个应用吗？"
-            @confirm="handleDelete"
-            ok-text="确定"
-            cancel-text="取消"
-          >
+          <a-popconfirm title="确定要删除这个应用吗？" @confirm="handleDelete" ok-text="确定" cancel-text="取消">
             <a-button danger>
               <template #icon>
                 <DeleteOutlined />
@@ -86,10 +89,13 @@ const handleDelete = () => {
 
 .app-basic-info {
   margin-bottom: 24px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 24px;
 }
 
 .info-item {
-  display: flex;
+  /* display: flex; */
   align-items: center;
   margin-bottom: 12px;
 }

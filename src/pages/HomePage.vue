@@ -192,8 +192,6 @@ const viewWork = (app: API.AppVO) => {
   }
 }
 
-// 格式化时间函数已移除，不再需要显示创建时间
-
 // 页面加载时获取数据
 onMounted(() => {
   loadMyApps()
@@ -229,7 +227,7 @@ onMounted(() => {
         <a-textarea
           v-model:value="userPrompt"
           placeholder="使用 NoCode 创建一个活动"
-          :rows="4"
+          :rows="6"
           :maxlength="500"
           class="prompt-input"
         />
@@ -468,15 +466,17 @@ onMounted(() => {
   border-radius: 16px;
   border: 1px solid rgba(0, 0, 0, 0.06);
   font-size: 16px;
-  padding: 20px 20px 60px 20px;
+  padding: 10px 60px 10px 10px;
   background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(20px);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
   resize: vertical;
   min-height: 120px;
-  max-height: 400px;
+  max-height: 500px;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   will-change: transform, box-shadow;
+  resize: none;
+  overflow: auto;
 }
 
 .prompt-input:hover {

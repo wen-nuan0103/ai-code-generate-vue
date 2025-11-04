@@ -24,9 +24,13 @@ declare namespace API {
     cover?: string
     initPrompt?: string
     codeGeneratorType?: string
+    tags?: string
     deployKey?: string
+    deployStatus?: number
     priority?: number
     userId?: number
+    currentStatus?: number
+    version?: number
   }
 
   type AppUpdateRequest = {
@@ -40,10 +44,15 @@ declare namespace API {
     cover?: string
     initPrompt?: string
     codeGeneratorType?: string
+    tags?: string[]
     deployKey?: string
+    deployStatus?: number
     deployedTime?: string
     priority?: number
     userId?: number
+    scopeStatus?: number
+    currentStatus?: number
+    version?: number
     createTime?: string
     updateTime?: string
     user?: UserVO
