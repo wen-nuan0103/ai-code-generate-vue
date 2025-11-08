@@ -33,22 +33,38 @@
       <!-- 中间：功能按钮组 -->
       <div class="header-center">
         <div class="tab-buttons">
-          <a-button class="tab-button" :type="activeTab === 'display' ? 'primary' : 'default'"
-            @click="activeTab = 'display'">
+          <a-button
+            class="tab-button"
+            :type="activeTab === 'display' ? 'primary' : 'default'"
+            @click="activeTab = 'display'"
+          >
             <i class="ri-window-line"></i>
           </a-button>
-          <a-button class="tab-button" :type="activeTab === 'code' ? 'primary' : 'default'" @click="activeTab = 'code'">
+          <a-button
+            class="tab-button"
+            :type="activeTab === 'code' ? 'primary' : 'default'"
+            @click="activeTab = 'code'"
+          >
             <i class="ri-code-s-slash-line"></i>
           </a-button>
-          <a-button class="tab-button" :type="activeTab === 'settings' ? 'primary' : 'default'"
-            @click="activeTab = 'settings'">
+          <a-button
+            class="tab-button"
+            :type="activeTab === 'settings' ? 'primary' : 'default'"
+            @click="activeTab = 'settings'"
+          >
             <i class="ri-settings-5-line"></i>
           </a-button>
         </div>
 
         <!-- 功能按钮区域（仅在"显示"标签时显示） -->
         <div class="action-buttons" :class="{ 'hidden-placeholder': activeTab !== 'display' }">
-          <a-button class="tab-button" v-for="btn in actionButtons" :key="btn.key" @click="btn.handler" :loading="btn.loading">
+          <a-button
+            class="tab-button"
+            v-for="btn in actionButtons"
+            :key="btn.key"
+            @click="btn.handler"
+            :loading="btn.loading"
+          >
             <a-tooltip placement="bottom">
               <template #title>
                 {{ btn.label }}
@@ -68,6 +84,10 @@
             <DownloadOutlined />
           </template>
         </a-button>
+        <a-button class="deploy-button" @click="exportToMarkdown" :loading="exporting">
+          <i class="ri-export-line"></i>
+          导出记录
+        </a-button>
         <a-button class="deploy-button" @click="deployApp" :loading="deploying">
           <i class="ri-rocket-line"></i>
           部署
@@ -81,6 +101,12 @@
       <div class="chat-section">
         <!-- 消息区域（可滚动） -->
         <div class="messages-container" ref="messagesContainer">
+          <!-- 加载更多按钮 -->
+          <div v-if="hasMoreHistory" class="load-more-container">
+            <a-button type="link" @click="loadMoreHistory" :loading="loadingHistory" size="small">
+              加载更多历史消息
+            </a-button>
+          </div>
           <div v-for="(message, index) in messages" :key="index" class="message-item">
             <div v-if="message.type === 'user'" class="user-message">
               <div class="message-content">{{ message.content }}</div>
@@ -107,13 +133,34 @@
         <div class="input-container">
           <div class="input-wrapper">
             <a-tooltip v-if="!isOwner" title="无法在别人的作品下对话哦~" placement="top">
-              <a-textarea class="chat-content" v-model:value="userInput" placeholder="请描述你想生成的网站，越详细效果越好哦" :rows="4" :maxlength="1000"
-                @keydown.enter.prevent="sendMessage" :disabled="isGenerating || !isOwner" />
+              <a-textarea
+                class="chat-content"
+                v-model:value="userInput"
+                placeholder="请描述你想生成的网站，越详细效果越好哦"
+                :rows="4"
+                :maxlength="1000"
+                @keydown.enter.prevent="sendMessage"
+                :disabled="isGenerating || !isOwner"
+              />
             </a-tooltip>
-            <a-textarea class="chat-content" v-else v-model:value="userInput" placeholder="请描述你想生成的网站，越详细效果越好哦" :rows="4" :maxlength="1000"
-              @keydown.enter.prevent="sendMessage" :disabled="isGenerating" />
+            <a-textarea
+              class="chat-content"
+              v-else
+              v-model:value="userInput"
+              placeholder="请描述你想生成的网站，越详细效果越好哦"
+              :rows="4"
+              :maxlength="1000"
+              @keydown.enter.prevent="sendMessage"
+              :disabled="isGenerating"
+            />
             <div class="input-actions">
-              <a-button class="sent-message-btn" type="primary" @click="sendMessage" :loading="isGenerating" :disabled="!isOwner">
+              <a-button
+                class="sent-message-btn"
+                type="primary"
+                @click="sendMessage"
+                :loading="isGenerating"
+                :disabled="!isOwner"
+              >
                 <template #icon>
                   <SendOutlined />
                 </template>
@@ -135,7 +182,13 @@
             <a-spin size="large" />
             <p>正在生成网站...</p>
           </div>
-          <iframe v-else :src="previewUrl" class="preview-iframe" frameborder="0" @load="onIframeLoad"></iframe>
+          <iframe
+            v-else
+            :src="previewUrl"
+            class="preview-iframe"
+            frameborder="0"
+            @load="onIframeLoad"
+          ></iframe>
         </div>
 
         <!-- 代码标签内容 -->
@@ -157,11 +210,20 @@
     </div>
 
     <!-- 应用详情弹窗 -->
-    <AppDetailModal v-model:open="appDetailVisible" :app="appInfo" :show-actions="isOwner || isAdmin" @edit="editApp"
-      @delete="deleteApp" />
+    <AppDetailModal
+      v-model:open="appDetailVisible"
+      :app="appInfo"
+      :show-actions="isOwner || isAdmin"
+      @edit="editApp"
+      @delete="deleteApp"
+    />
 
     <!-- 部署成功弹窗 -->
-    <DeploySuccessModal v-model:open="deployModalVisible" :deploy-url="deployUrl" @open-site="openDeployedSite" />
+    <DeploySuccessModal
+      v-model:open="deployModalVisible"
+      :deploy-url="deployUrl"
+      @open-site="openDeployedSite"
+    />
   </div>
 </template>
 
@@ -185,17 +247,13 @@ import aiAvatar from '@/assets/aiAvatar.png'
 import { API_BASE_URL, getStaticPreviewUrl } from '@/config/env'
 
 import {
-  CloudUploadOutlined,
   SendOutlined,
-  ExportOutlined,
   InfoCircleOutlined,
-  DownOutlined,
   EditOutlined,
   DeleteOutlined,
-  EyeOutlined,
-  ReloadOutlined,
   DownloadOutlined,
 } from '@ant-design/icons-vue'
+import { exportMarkdown, listAppChatHistory } from '@/api/chatHistoryController'
 
 const route = useRoute()
 const router = useRouter()
@@ -221,6 +279,12 @@ const isGenerating = ref(false)
 const messagesContainer = ref<HTMLElement>()
 const hasInitialConversation = ref(false) // 标记是否已经进行过初始对话
 
+// 对话历史相关
+const loadingHistory = ref(false)
+const hasMoreHistory = ref(false)
+const lastCreateTime = ref<string>()
+const historyLoaded = ref(false)
+
 // 预览相关
 const previewUrl = ref('')
 const previewReady = ref(false)
@@ -229,6 +293,9 @@ const previewReady = ref(false)
 const deploying = ref(false)
 const deployModalVisible = ref(false)
 const deployUrl = ref('')
+
+// 导出相关
+const exporting = ref(false)
 
 // 权限相关
 const isOwner = computed(() => {
@@ -272,6 +339,62 @@ const showAppDetail = () => {
   appDetailVisible.value = true
 }
 
+// 加载对话历史
+const loadChatHistory = async (isLoadMore = false) => {
+  if (!appId.value || loadingHistory.value) return
+  loadingHistory.value = true
+  try {
+    const params: API.listAppChatHistoryParams = {
+      appId: appId.value as unknown as number,
+      pageNum: 10,
+    }
+    // 如果是加载更多，传递最老一条消息的创建时间作为游标
+    if (isLoadMore && lastCreateTime.value) {
+      params.lastCreateTime = lastCreateTime.value
+    }
+    const res = await listAppChatHistory(params)
+    if (res.data.code === 0 && res.data.data) {
+      const chatHistories = res.data.data.records || []
+      if (chatHistories.length > 0) {
+        // 后端返回的是按创建时间降序排列的（最新的在前）
+        // 需要反转数组，让老消息在前
+        const historyMessages: Message[] = chatHistories.reverse().map((chat) => ({
+          type: (chat.messageType === 'user' ? 'user' : 'ai') as 'user' | 'ai',
+          content: chat.message || '',
+        }))
+
+        if (isLoadMore) {
+          // 加载更多时，将历史消息添加到开头
+          messages.value.unshift(...historyMessages)
+        } else {
+          // 初始加载，直接设置消息列表
+          messages.value = historyMessages
+        }
+
+        // 更新游标：因为后端返回的是降序，所以最后一条（反转前）是最老的
+        // 反转后，chatHistories[0] 是最老的
+        lastCreateTime.value = chatHistories[0]?.createTime
+
+        // 检查是否还有更多历史
+        hasMoreHistory.value = chatHistories.length === 10
+      } else {
+        hasMoreHistory.value = false
+      }
+      historyLoaded.value = true
+    }
+  } catch (error) {
+    console.error('加载对话历史失败：', error)
+    message.error('加载对话历史失败')
+  } finally {
+    loadingHistory.value = false
+  }
+}
+
+// 加载更多历史消息
+const loadMoreHistory = async () => {
+  await loadChatHistory(true)
+}
+
 // 获取应用信息
 const fetchAppInfo = async () => {
   const id = route.params.id as string
@@ -287,15 +410,6 @@ const fetchAppInfo = async () => {
     const res = await getAppVoById({ id: id as unknown as number })
     if (res.data.code === 0 && res.data.data) {
       appInfo.value = res.data.data
-
-      // 检查是否有view=1参数，如果有则不自动发送初始提示词
-      const isViewMode = route.query.view === '1'
-
-      // 自动发送初始提示词（除非是查看模式或已经进行过初始对话）
-      if (appInfo.value.initPrompt && !isViewMode && !hasInitialConversation.value) {
-        hasInitialConversation.value = true
-        await sendInitialMessage(appInfo.value.initPrompt)
-      }
     } else {
       message.error('获取应用信息失败')
       router.push('/')
@@ -506,6 +620,42 @@ const deployApp = async () => {
   }
 }
 
+const exportToMarkdown = async () => {
+  if (!appId.value) {
+    message.error('应用ID不存在')
+    return
+  }
+
+  exporting.value = true
+  try {
+    const res = await exportMarkdown({
+      appId: appId.value as unknown as number,
+    })
+
+    if (res.data.code === 0 && res.data.data) {
+
+      const markdown = res.data.data;
+      const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `chat-history-${appId.value}.md`;
+      link.click();
+
+      URL.revokeObjectURL(url);
+      message.success('导出成功')
+    } else {
+      message.error('导出失败：' + res.data.message)
+    }
+  } catch (error) {
+    console.error('导出失败：', error)
+    message.error('导出失败，请重试')
+  } finally {
+    exporting.value = false
+  }  
+}
+
 // 在新窗口打开预览
 const openInNewTab = () => {
   if (previewUrl.value) {
@@ -571,9 +721,38 @@ const downloadApp = () => {
   message.info('下载功能（预留）')
 }
 
-// 页面加载时获取应用信息
+// 初始化页面
+const initPage = async () => {
+  // 1. 先获取应用信息
+  await fetchAppInfo()
+
+  if (!appId.value || !appInfo.value) {
+    return
+  }
+
+  // 2. 加载对话历史
+  await loadChatHistory()
+
+  // 3. 如果有至少 2 条对话记录，展示对应的网站
+  if (messages.value.length >= 2) {
+    updatePreview()
+  }
+
+  // 4. 如果是自己的 app，并且没有对话历史，才自动将 initPrompt 作为第一条消息触发对话
+  if (
+    isOwner.value &&
+    messages.value.length === 0 &&
+    appInfo.value.initPrompt &&
+    !hasInitialConversation.value
+  ) {
+    hasInitialConversation.value = true
+    await sendInitialMessage(appInfo.value.initPrompt)
+  }
+}
+
+// 页面加载时初始化
 onMounted(() => {
-  fetchAppInfo()
+  initPage()
 })
 
 // 清理资源
@@ -643,11 +822,9 @@ onUnmounted(() => {
   /* gap: 8px; */
 }
 
- .tab-button {
+.tab-button {
   padding: 4px 8px !important;
   margin: 8px !important;
-  
-
 }
 
 .tab-button:nth-child(2) {
@@ -660,14 +837,12 @@ onUnmounted(() => {
   margin-left: 16px; */
   padding-left: 16px;
   border-left: 1px solid #e8e8e8;
-
 }
 
 :where(.css-dev-only-do-not-override-1p3hq3p).tab-button.ant-btn-default {
   background-color: #f5f5f5;
   border-color: transparent;
 }
-
 
 /* 隐藏但保持空间占位 */
 .hidden-placeholder {
@@ -835,8 +1010,8 @@ onUnmounted(() => {
   flex: 1;
   position: relative;
   overflow: auto;
-    border-radius: 8px;
-    border: 1px solid oklch(.928 .006 264.531);
+  border-radius: 8px;
+  border: 1px solid oklch(0.928 0.006 264.531);
 }
 
 /* 显示标签内容 */
