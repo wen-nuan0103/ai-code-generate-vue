@@ -193,9 +193,32 @@
 
         <!-- 代码标签内容 -->
         <div v-else-if="activeTab === 'code'" class="tab-content code-content">
-          <div class="code-placeholder">
-            <div class="placeholder-icon">📝</div>
-            <p>代码展示区域（预留后端数据注入）</p>
+          <div class="code-header">
+            <span class="file-name">
+              {{ currentFileName || '代码编辑器' }}
+            </span>
+            <!-- <a-button size="small" @click="fetchCodeContent()" :loading="loadingCode">
+              <template #icon>
+                <i class="ri-refresh-line"></i>
+              </template>
+              刷新
+            </a-button> -->
+          </div>
+          <div class="code-editor-wrapper">
+            <a-spin :spinning="loadingCode" tip="加载代码中...">
+              <CodeEditor
+                v-model:value="code"
+                :language="codeLanguage"
+                :options="{
+                  readOnly: false,
+                  minimap: { enabled: true },
+                  fontSize: 14,
+                  lineNumbers: 'on',
+                  scrollBeyondLastLine: false,
+                  automaticLayout: true,
+                }"
+              />
+            </a-spin>
           </div>
         </div>
 
@@ -243,8 +266,11 @@ import request from '@/request'
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import AppDetailModal from '@/components/AppDetailModal.vue'
 import DeploySuccessModal from '@/components/DeploySuccessModal.vue'
+
+import { CodeEditor } from 'monaco-editor-vue3'
+
 import aiAvatar from '@/assets/aiAvatar.png'
-import { API_BASE_URL, getStaticPreviewUrl } from '@/config/env'
+import { API_BASE_URL, STATIC_BASE_URL, getStaticPreviewUrl } from '@/config/env'
 
 import {
   SendOutlined,
@@ -265,6 +291,32 @@ const appId = ref<string>()
 
 // 标签切换状态
 const activeTab = ref<'display' | 'code' | 'settings'>('display')
+
+// 代码相关
+interface CodeFile {
+  name: string
+  content: string
+  language: string
+}
+
+const codeFiles = ref<CodeFile[]>([]) // 所有生成的文件
+const currentFileName = ref('') // 当前查看的文件名
+const codeLanguage = ref('html') // 代码语言
+const loadingCode = ref(false) // 代码加载状态
+
+// 当前显示的代码
+const code = computed({
+  get: () => {
+    const currentFile = codeFiles.value.find((f) => f.name === currentFileName.value)
+    return currentFile?.content || '// 代码生成完成后将在这里显示'
+  },
+  set: (value: string) => {
+    const currentFile = codeFiles.value.find((f) => f.name === currentFileName.value)
+    if (currentFile) {
+      currentFile.content = value
+    }
+  },
+})
 
 // 对话相关
 interface Message {
@@ -512,11 +564,29 @@ const generateCode = async (userMessage: string, aiMessageIndex: number) => {
         // 拼接内容
         if (content !== undefined && content !== null) {
           fullContent += content
+
           const aiMessage = messages.value[aiMessageIndex]
           if (aiMessage) {
             aiMessage.content = fullContent
             aiMessage.loading = false
           }
+
+          // 实时提取并更新所有文件
+          const extractedFiles = extractFilesFromMarkdown(fullContent)
+          if (extractedFiles.length > 0) {
+            codeFiles.value = extractedFiles
+            // 如果还没有选中文件，自动选中第一个
+            const firstFile = extractedFiles[0]
+            if (
+              firstFile &&
+              (!currentFileName.value ||
+                !extractedFiles.find((f) => f.name === currentFileName.value))
+            ) {
+              currentFileName.value = firstFile.name
+              codeLanguage.value = firstFile.language
+            }
+          }
+
           scrollToBottom()
         }
       } catch (error) {
@@ -533,10 +603,12 @@ const generateCode = async (userMessage: string, aiMessageIndex: number) => {
       isGenerating.value = false
       eventSource?.close()
 
-      // 延迟更新预览，确保后端已完成处理
+      // 延迟更新预览和代码，确保后端已完成处理
       setTimeout(async () => {
         await fetchAppInfo()
         updatePreview()
+        // 自动加载生成的代码内容
+        await fetchCodeContent()
       }, 1000)
     })
 
@@ -552,6 +624,8 @@ const generateCode = async (userMessage: string, aiMessageIndex: number) => {
         setTimeout(async () => {
           await fetchAppInfo()
           updatePreview()
+          // 自动加载生成的代码内容
+          await fetchCodeContent()
         }, 1000)
       } else {
         handleError(new Error('SSE连接错误'), aiMessageIndex)
@@ -573,6 +647,125 @@ const handleError = (error: unknown, aiMessageIndex: number) => {
   }
   message.error('生成失败，请重试')
   isGenerating.value = false
+}
+
+// 获取代码文件内容
+const fetchCodeContent = async (fileName?: string) => {
+  if (!appId.value) return
+
+  loadingCode.value = true
+  try {
+    const codeGenType = appInfo.value?.codeGeneratorType || CodeGenTypeEnum.HTML
+    const targetFile = fileName || getMainFileName(codeGenType)
+
+    // 构建代码文件URL
+    const baseUrl = `${STATIC_BASE_URL}/${codeGenType}_${appId.value}/`
+    let codeUrl = ''
+
+    if (codeGenType === CodeGenTypeEnum.VUE_PROJECT) {
+      // Vue 项目模式，可能需要查看源代码
+      codeUrl = `${baseUrl}src/${targetFile}`
+    } else {
+      codeUrl = `${baseUrl}${targetFile}`
+    }
+
+    // 使用 fetch 获取代码内容
+    const response = await fetch(codeUrl, {
+      credentials: 'include',
+    })
+
+    if (response.ok) {
+      const codeContent = await response.text()
+      code.value = codeContent
+      currentFileName.value = targetFile
+
+      // 根据文件扩展名设置语言
+      const ext = targetFile.split('.').pop()?.toLowerCase()
+      codeLanguage.value = getLanguageByExtension(ext || 'html')
+    } else {
+      code.value = `// 无法加载文件: ${targetFile}\n// 请确保代码已生成完成`
+    }
+  } catch (error) {
+    console.error('获取代码内容失败：', error)
+    code.value = `// 加载代码失败，请稍后重试`
+  } finally {
+    loadingCode.value = false
+  }
+}
+
+// 根据代码生成类型获取主文件名
+const getMainFileName = (codeGenType: string): string => {
+  switch (codeGenType) {
+    case CodeGenTypeEnum.HTML:
+      return 'index.html'
+    case CodeGenTypeEnum.MULTI_FILE:
+      return 'index.html'
+    case CodeGenTypeEnum.VUE_PROJECT:
+      return 'App.vue'
+    default:
+      return 'index.html'
+  }
+}
+
+// 根据文件扩展名获取语言类型
+const getLanguageByExtension = (ext: string): string => {
+  const languageMap: Record<string, string> = {
+    html: 'html',
+    htm: 'html',
+    css: 'css',
+    js: 'javascript',
+    ts: 'typescript',
+    vue: 'vue',
+    json: 'json',
+    md: 'markdown',
+    jsx: 'javascript',
+    tsx: 'typescript',
+  }
+  return languageMap[ext] || 'plaintext'
+}
+
+// 从 Markdown 中提取所有文件
+const extractFilesFromMarkdown = (markdown: string): CodeFile[] => {
+  const files: CodeFile[] = []
+
+  // 匹配 [工具调用] 写入文件 filename 后面紧跟的代码块
+  const fileRegex = /\[工具调用\]\s*写入文件\s+([^\n]+)\n```(\w+)?\n([\s\S]*?)```/g
+  const matches = [...markdown.matchAll(fileRegex)]
+
+  for (const match of matches) {
+    const fileName = match[1]?.trim() || 'unknown'
+    const language = match[2] || detectLanguageFromFileName(fileName)
+    const content = match[3] || ''
+
+    files.push({
+      name: fileName,
+      content: content.trim(),
+      language: normalizeLanguage(language),
+    })
+  }
+
+  return files
+}
+
+// 根据文件名检测语言
+const detectLanguageFromFileName = (fileName: string): string => {
+  const ext = fileName.split('.').pop()?.toLowerCase() || ''
+  return getLanguageByExtension(ext)
+}
+
+// 标准化语言名称
+const normalizeLanguage = (lang: string): string => {
+  const langMap: Record<string, string> = {
+    js: 'javascript',
+    ts: 'typescript',
+    py: 'python',
+    rb: 'ruby',
+    md: 'markdown',
+    sh: 'shell',
+    bash: 'shell',
+    htm: 'html',
+  }
+  return langMap[lang.toLowerCase()] || lang.toLowerCase()
 }
 
 // 更新预览
@@ -633,17 +826,16 @@ const exportToMarkdown = async () => {
     })
 
     if (res.data.code === 0 && res.data.data) {
+      const markdown = res.data.data
+      const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
 
-      const markdown = res.data.data;
-      const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `chat-history-${appId.value}.md`
+      link.click()
 
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `chat-history-${appId.value}.md`;
-      link.click();
-
-      URL.revokeObjectURL(url);
+      URL.revokeObjectURL(url)
       message.success('导出成功')
     } else {
       message.error('导出失败：' + res.data.message)
@@ -653,7 +845,7 @@ const exportToMarkdown = async () => {
     message.error('导出失败，请重试')
   } finally {
     exporting.value = false
-  }  
+  }
 }
 
 // 在新窗口打开预览
@@ -736,6 +928,8 @@ const initPage = async () => {
   // 3. 如果有至少 2 条对话记录，展示对应的网站
   if (messages.value.length >= 2) {
     updatePreview()
+    // 同时加载代码内容
+    await fetchCodeContent()
   }
 
   // 4. 如果是自己的 app，并且没有对话历史，才自动将 initPrompt 作为第一条消息触发对话
@@ -904,6 +1098,12 @@ onUnmounted(() => {
   scroll-behavior: smooth;
 }
 
+.load-more-container {
+  text-align: center;
+  padding: 12px 0;
+  margin-bottom: 16px;
+}
+
 .message-item {
   margin-bottom: 12px;
 }
@@ -1061,8 +1261,37 @@ onUnmounted(() => {
 
 /* 代码标签内容 */
 .code-content {
-  padding: 16px;
-  /* background: #fafafa; */
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+}
+
+.code-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #f5f5f5;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.file-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1a1a1a;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+
+.code-editor-wrapper {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.code-editor-wrapper :deep(.ant-spin-nested-loading),
+.code-editor-wrapper :deep(.ant-spin-container) {
+  height: 100%;
 }
 
 .code-placeholder {
