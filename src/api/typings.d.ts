@@ -153,6 +153,10 @@ declare namespace API {
     id?: number
   }
 
+  type downloadAppCodeParams = {
+    appId: number
+  }
+
   type exportMarkdownParams = {
     appId: number
   }

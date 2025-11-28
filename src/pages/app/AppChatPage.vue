@@ -7,6 +7,9 @@
         <a-avatar :src="userStore.user.avatar" :size="36" />
         <div class="project-name-container">
           <span class="project-name">{{ appInfo?.appName || '未命名项目' }}</span>
+          <a-tag v-if="appInfo?.codeGeneratorType" color="blue" class="code-generate-type-tag">
+            {{ formatCodeGenType(appInfo.codeGeneratorType) }}
+          </a-tag>
           <a-dropdown>
             <template #overlay>
               <a-menu>
@@ -33,38 +36,23 @@
       <!-- 中间：功能按钮组 -->
       <div class="header-center">
         <div class="tab-buttons">
-          <a-button
-            class="tab-button"
-            :type="activeTab === 'display' ? 'primary' : 'default'"
-            @click="activeTab = 'display'"
-          >
+          <a-button class="tab-button" :type="activeTab === 'display' ? 'primary' : 'default'"
+            @click="activeTab = 'display'">
             <i class="ri-window-line"></i>
           </a-button>
-          <a-button
-            class="tab-button"
-            :type="activeTab === 'code' ? 'primary' : 'default'"
-            @click="activeTab = 'code'"
-          >
+          <a-button class="tab-button" :type="activeTab === 'code' ? 'primary' : 'default'" @click="activeTab = 'code'">
             <i class="ri-code-s-slash-line"></i>
           </a-button>
-          <a-button
-            class="tab-button"
-            :type="activeTab === 'settings' ? 'primary' : 'default'"
-            @click="activeTab = 'settings'"
-          >
+          <a-button class="tab-button" :type="activeTab === 'settings' ? 'primary' : 'default'"
+            @click="activeTab = 'settings'">
             <i class="ri-settings-5-line"></i>
           </a-button>
         </div>
 
         <!-- 功能按钮区域（仅在"显示"标签时显示） -->
         <div class="action-buttons" :class="{ 'hidden-placeholder': activeTab !== 'display' }">
-          <a-button
-            class="tab-button"
-            v-for="btn in actionButtons"
-            :key="btn.key"
-            @click="btn.handler"
-            :loading="btn.loading"
-          >
+          <a-button class="tab-button" v-for="btn in actionButtons" :key="btn.key" @click="btn.handler"
+            :loading="btn.loading">
             <a-tooltip placement="bottom">
               <template #title>
                 {{ btn.label }}
@@ -79,7 +67,7 @@
 
       <!-- 右侧：下载 + 部署按钮 -->
       <div class="header-right">
-        <a-button @click="downloadApp">
+        <a-button @click="downloadApp" :loading="downloading" :disabled="!isOwner">
           <template #icon>
             <DownloadOutlined />
           </template>
@@ -90,7 +78,7 @@
         </a-button>
         <a-button class="deploy-button" @click="deployApp" :loading="deploying">
           <i class="ri-rocket-line"></i>
-          部署
+          {{ appInfo?.deployStatus == 0 ? "部署" : appInfo?.deployStatus == 1 ? "下线" : "部署失败"}}
         </a-button>
       </div>
     </div>
@@ -133,34 +121,14 @@
         <div class="input-container">
           <div class="input-wrapper">
             <a-tooltip v-if="!isOwner" title="无法在别人的作品下对话哦~" placement="top">
-              <a-textarea
-                class="chat-content"
-                v-model:value="userInput"
-                placeholder="请描述你想生成的网站，越详细效果越好哦"
-                :rows="4"
-                :maxlength="1000"
-                @keydown.enter.prevent="sendMessage"
-                :disabled="isGenerating || !isOwner"
-              />
+              <a-textarea class="chat-content" v-model:value="userInput" placeholder="请描述你想生成的网站，越详细效果越好哦" :rows="4"
+                :maxlength="1000" @keydown.enter.prevent="sendMessage" :disabled="isGenerating || !isOwner" />
             </a-tooltip>
-            <a-textarea
-              class="chat-content"
-              v-else
-              v-model:value="userInput"
-              placeholder="请描述你想生成的网站，越详细效果越好哦"
-              :rows="4"
-              :maxlength="1000"
-              @keydown.enter.prevent="sendMessage"
-              :disabled="isGenerating"
-            />
+            <a-textarea class="chat-content" v-else v-model:value="userInput" placeholder="请描述你想生成的网站，越详细效果越好哦"
+              :rows="4" :maxlength="1000" @keydown.enter.prevent="sendMessage" :disabled="isGenerating" />
             <div class="input-actions">
-              <a-button
-                class="sent-message-btn"
-                type="primary"
-                @click="sendMessage"
-                :loading="isGenerating"
-                :disabled="!isOwner"
-              >
+              <a-button class="sent-message-btn" type="primary" @click="sendMessage" :loading="isGenerating"
+                :disabled="!isOwner">
                 <template #icon>
                   <SendOutlined />
                 </template>
@@ -182,43 +150,21 @@
             <a-spin size="large" />
             <p>正在生成网站...</p>
           </div>
-          <iframe
-            v-else
-            :src="previewUrl"
-            class="preview-iframe"
-            frameborder="0"
-            @load="onIframeLoad"
-          ></iframe>
+          <iframe v-else :src="previewUrl" class="preview-iframe" frameborder="0" @load="onIframeLoad"></iframe>
         </div>
 
         <!-- 代码标签内容 -->
         <div v-else-if="activeTab === 'code'" class="tab-content code-content">
-          <div class="code-header">
-            <span class="file-name">
-              {{ currentFileName || '代码编辑器' }}
-            </span>
-            <!-- <a-button size="small" @click="fetchCodeContent()" :loading="loadingCode">
-              <template #icon>
-                <i class="ri-refresh-line"></i>
-              </template>
-              刷新
-            </a-button> -->
-          </div>
-          <div class="code-editor-wrapper">
-            <a-spin :spinning="loadingCode" tip="加载代码中...">
-              <CodeEditor
-                v-model:value="code"
-                :language="codeLanguage"
-                :options="{
-                  readOnly: false,
-                  minimap: { enabled: true },
-                  fontSize: 14,
-                  lineNumbers: 'on',
-                  scrollBeyondLastLine: false,
-                  automaticLayout: true,
-                }"
-              />
-            </a-spin>
+          <div class="editor-container">
+            <!-- Tabs -->
+            <div class="tabs">
+              <div v-for="f in files" :key="f.id" class="tab" :class="{ active: f.id === activeFileId }"
+                @click="switchFile(f.id)">
+                {{ f.name }}
+              </div>
+            </div>
+            <CodeEditor v-model:value="code" :language="language" :options="editorOptions" class="editor"
+              @change="onCodeChange" />
           </div>
         </div>
 
@@ -233,20 +179,11 @@
     </div>
 
     <!-- 应用详情弹窗 -->
-    <AppDetailModal
-      v-model:open="appDetailVisible"
-      :app="appInfo"
-      :show-actions="isOwner || isAdmin"
-      @edit="editApp"
-      @delete="deleteApp"
-    />
+    <AppDetailModal v-model:open="appDetailVisible" :app="appInfo" :show-actions="isOwner || isAdmin" @edit="editApp"
+      @delete="deleteApp" />
 
     <!-- 部署成功弹窗 -->
-    <DeploySuccessModal
-      v-model:open="deployModalVisible"
-      :deploy-url="deployUrl"
-      @open-site="openDeployedSite"
-    />
+    <DeploySuccessModal v-model:open="deployModalVisible" :deploy-url="deployUrl" @open-site="openDeployedSite" />
   </div>
 </template>
 
@@ -254,23 +191,22 @@
 import { ref, onMounted, nextTick, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
+import * as monaco from "monaco-editor";
+import { CodeEditor } from 'monaco-editor-vue3';
 import { useUserStore } from '@/stores/user'
 import {
   getAppVoById,
   deploy as deployAppApi,
   deleteApp as deleteAppApi,
 } from '@/api/appController'
-import { CodeGenTypeEnum } from '@/utils/codeGenerateTypes'
+import { CodeGenTypeEnum, formatCodeGenType } from '@/utils/codeGenerateTypes'
 import request from '@/request'
 
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import AppDetailModal from '@/components/AppDetailModal.vue'
 import DeploySuccessModal from '@/components/DeploySuccessModal.vue'
-
-import { CodeEditor } from 'monaco-editor-vue3'
-
 import aiAvatar from '@/assets/aiAvatar.png'
-import { API_BASE_URL, STATIC_BASE_URL, getStaticPreviewUrl } from '@/config/env'
+import { API_BASE_URL, getStaticPreviewUrl } from '@/config/env'
 
 import {
   SendOutlined,
@@ -292,44 +228,49 @@ const appId = ref<string>()
 // 标签切换状态
 const activeTab = ref<'display' | 'code' | 'settings'>('display')
 
-// 代码相关
-interface CodeFile {
-  name: string
-  content: string
-  language: string
-}
-
-const codeFiles = ref<CodeFile[]>([]) // 所有生成的文件
-const currentFileName = ref('') // 当前查看的文件名
-const codeLanguage = ref('html') // 代码语言
-const loadingCode = ref(false) // 代码加载状态
-
-// 当前显示的代码
-const code = computed({
-  get: () => {
-    const currentFile = codeFiles.value.find((f) => f.name === currentFileName.value)
-    return currentFile?.content || '// 代码生成完成后将在这里显示'
-  },
-  set: (value: string) => {
-    const currentFile = codeFiles.value.find((f) => f.name === currentFileName.value)
-    if (currentFile) {
-      currentFile.content = value
-    }
-  },
-})
-
 // 对话相关
 interface Message {
   type: 'user' | 'ai'
   content: string
   loading?: boolean
 }
-
 const messages = ref<Message[]>([])
 const userInput = ref('')
 const isGenerating = ref(false)
 const messagesContainer = ref<HTMLElement>()
 const hasInitialConversation = ref(false) // 标记是否已经进行过初始对话
+
+const code = ref("");
+const language = ref("javascript")
+const files = ref([
+  {
+    id: "file1",
+    name: "index.js",
+    value: `function hello() {\n  console.log("Hello World");\n}`,
+  },
+  {
+    id: "file2",
+    name: "style.css",
+    value: `body {\n  background: #f2f2f2;\n}`,
+  },
+  {
+    id: "file3",
+    name: "README.md",
+    value: `# Project\n\nThis is a multi-file Monaco editor.`,
+  },
+]);
+const activeFileId = ref("file1");
+const models = new Map();
+
+const editorOptions = {
+  readOnly: false,
+  minimap: { enabled: true },
+  fontSize: 14,
+  wordWrap: "on",
+  automaticLayout: true,
+};
+
+
 
 // 对话历史相关
 const loadingHistory = ref(false)
@@ -353,7 +294,6 @@ const exporting = ref(false)
 const isOwner = computed(() => {
   return appInfo.value?.userId === userStore.user.id
 })
-
 const isAdmin = computed(() => {
   return userStore.user.role === 'admin'
 })
@@ -408,7 +348,6 @@ const loadChatHistory = async (isLoadMore = false) => {
     if (res.data.code === 0 && res.data.data) {
       const chatHistories = res.data.data.records || []
       if (chatHistories.length > 0) {
-        // 后端返回的是按创建时间降序排列的（最新的在前）
         // 需要反转数组，让老消息在前
         const historyMessages: Message[] = chatHistories.reverse().map((chat) => ({
           type: (chat.messageType === 'user' ? 'user' : 'ai') as 'user' | 'ai',
@@ -534,15 +473,11 @@ const generateCode = async (userMessage: string, aiMessageIndex: number) => {
   let streamCompleted = false
 
   try {
-    // 获取 axios 配置的 baseURL
     const baseURL = request.defaults.baseURL || API_BASE_URL
-
-    // 构建URL参数
     const params = new URLSearchParams({
       appId: appId.value || '',
       userMessage: userMessage,
     })
-
     const url = `${baseURL}/app/chat/generate/code?${params}`
 
     // 创建 EventSource 连接
@@ -557,36 +492,17 @@ const generateCode = async (userMessage: string, aiMessageIndex: number) => {
       if (streamCompleted) return
 
       try {
-        // 解析JSON包装的数据
         const parsed = JSON.parse(event.data)
         const content = parsed.d
 
         // 拼接内容
         if (content !== undefined && content !== null) {
           fullContent += content
-
           const aiMessage = messages.value[aiMessageIndex]
           if (aiMessage) {
             aiMessage.content = fullContent
             aiMessage.loading = false
           }
-
-          // 实时提取并更新所有文件
-          const extractedFiles = extractFilesFromMarkdown(fullContent)
-          if (extractedFiles.length > 0) {
-            codeFiles.value = extractedFiles
-            // 如果还没有选中文件，自动选中第一个
-            const firstFile = extractedFiles[0]
-            if (
-              firstFile &&
-              (!currentFileName.value ||
-                !extractedFiles.find((f) => f.name === currentFileName.value))
-            ) {
-              currentFileName.value = firstFile.name
-              codeLanguage.value = firstFile.language
-            }
-          }
-
           scrollToBottom()
         }
       } catch (error) {
@@ -603,12 +519,9 @@ const generateCode = async (userMessage: string, aiMessageIndex: number) => {
       isGenerating.value = false
       eventSource?.close()
 
-      // 延迟更新预览和代码，确保后端已完成处理
       setTimeout(async () => {
         await fetchAppInfo()
         updatePreview()
-        // 自动加载生成的代码内容
-        await fetchCodeContent()
       }, 1000)
     })
 
@@ -624,8 +537,6 @@ const generateCode = async (userMessage: string, aiMessageIndex: number) => {
         setTimeout(async () => {
           await fetchAppInfo()
           updatePreview()
-          // 自动加载生成的代码内容
-          await fetchCodeContent()
         }, 1000)
       } else {
         handleError(new Error('SSE连接错误'), aiMessageIndex)
@@ -649,125 +560,6 @@ const handleError = (error: unknown, aiMessageIndex: number) => {
   isGenerating.value = false
 }
 
-// 获取代码文件内容
-const fetchCodeContent = async (fileName?: string) => {
-  if (!appId.value) return
-
-  loadingCode.value = true
-  try {
-    const codeGenType = appInfo.value?.codeGeneratorType || CodeGenTypeEnum.HTML
-    const targetFile = fileName || getMainFileName(codeGenType)
-
-    // 构建代码文件URL
-    const baseUrl = `${STATIC_BASE_URL}/${codeGenType}_${appId.value}/`
-    let codeUrl = ''
-
-    if (codeGenType === CodeGenTypeEnum.VUE_PROJECT) {
-      // Vue 项目模式，可能需要查看源代码
-      codeUrl = `${baseUrl}src/${targetFile}`
-    } else {
-      codeUrl = `${baseUrl}${targetFile}`
-    }
-
-    // 使用 fetch 获取代码内容
-    const response = await fetch(codeUrl, {
-      credentials: 'include',
-    })
-
-    if (response.ok) {
-      const codeContent = await response.text()
-      code.value = codeContent
-      currentFileName.value = targetFile
-
-      // 根据文件扩展名设置语言
-      const ext = targetFile.split('.').pop()?.toLowerCase()
-      codeLanguage.value = getLanguageByExtension(ext || 'html')
-    } else {
-      code.value = `// 无法加载文件: ${targetFile}\n// 请确保代码已生成完成`
-    }
-  } catch (error) {
-    console.error('获取代码内容失败：', error)
-    code.value = `// 加载代码失败，请稍后重试`
-  } finally {
-    loadingCode.value = false
-  }
-}
-
-// 根据代码生成类型获取主文件名
-const getMainFileName = (codeGenType: string): string => {
-  switch (codeGenType) {
-    case CodeGenTypeEnum.HTML:
-      return 'index.html'
-    case CodeGenTypeEnum.MULTI_FILE:
-      return 'index.html'
-    case CodeGenTypeEnum.VUE_PROJECT:
-      return 'App.vue'
-    default:
-      return 'index.html'
-  }
-}
-
-// 根据文件扩展名获取语言类型
-const getLanguageByExtension = (ext: string): string => {
-  const languageMap: Record<string, string> = {
-    html: 'html',
-    htm: 'html',
-    css: 'css',
-    js: 'javascript',
-    ts: 'typescript',
-    vue: 'vue',
-    json: 'json',
-    md: 'markdown',
-    jsx: 'javascript',
-    tsx: 'typescript',
-  }
-  return languageMap[ext] || 'plaintext'
-}
-
-// 从 Markdown 中提取所有文件
-const extractFilesFromMarkdown = (markdown: string): CodeFile[] => {
-  const files: CodeFile[] = []
-
-  // 匹配 [工具调用] 写入文件 filename 后面紧跟的代码块
-  const fileRegex = /\[工具调用\]\s*写入文件\s+([^\n]+)\n```(\w+)?\n([\s\S]*?)```/g
-  const matches = [...markdown.matchAll(fileRegex)]
-
-  for (const match of matches) {
-    const fileName = match[1]?.trim() || 'unknown'
-    const language = match[2] || detectLanguageFromFileName(fileName)
-    const content = match[3] || ''
-
-    files.push({
-      name: fileName,
-      content: content.trim(),
-      language: normalizeLanguage(language),
-    })
-  }
-
-  return files
-}
-
-// 根据文件名检测语言
-const detectLanguageFromFileName = (fileName: string): string => {
-  const ext = fileName.split('.').pop()?.toLowerCase() || ''
-  return getLanguageByExtension(ext)
-}
-
-// 标准化语言名称
-const normalizeLanguage = (lang: string): string => {
-  const langMap: Record<string, string> = {
-    js: 'javascript',
-    ts: 'typescript',
-    py: 'python',
-    rb: 'ruby',
-    md: 'markdown',
-    sh: 'shell',
-    bash: 'shell',
-    htm: 'html',
-  }
-  return langMap[lang.toLowerCase()] || lang.toLowerCase()
-}
-
 // 更新预览
 const updatePreview = () => {
   if (appId.value) {
@@ -785,6 +577,51 @@ const scrollToBottom = () => {
   }
 }
 
+// 切换文件
+const switchFile = (id: string) => {
+  activeFileId.value = id;
+  const file = files.value.find((f) => f.id === id);
+  if (file) {
+    if (!models.has(id)) {
+      const model = monaco.editor.createModel(
+        file.value,
+        getLanguageByExtension(file.name)
+      );
+      models.set(id, model);
+    }
+  }
+
+  const model = models.get(id);
+
+  // 设置编辑器内容（v-model）
+  code.value = model.getValue();
+  language.value = model.getLanguageId();
+}
+
+// 当切换文件,需要更改代码编辑器的内容
+const onCodeChange = (newVal: any) => {
+  const model = models.get(activeFileId.value);
+  if (model && newVal !== model.getValue()) {
+    model.setValue(newVal);
+  }
+}
+
+// 获取文件扩展名,用于高亮显示
+const getLanguageByExtension = (name: string) => {
+  const ext = name.split(".").pop();
+  switch (ext) {
+    case "js": return "javascript";
+    case "ts": return "typescript";
+    case "vue": return "vue";
+    case "json": return "json";
+    case "html": return "html";
+    case "css": return "css";
+    case "scss": return "scss";
+    case "md": return "markdown";
+    default: return "plaintext";
+  }
+}
+
 // 部署应用
 const deployApp = async () => {
   if (!appId.value) {
@@ -794,16 +631,24 @@ const deployApp = async () => {
 
   deploying.value = true
   try {
-    const res = await deployAppApi({
-      appId: appId.value as unknown as number,
-    })
+    switch(appInfo.value?.deployStatus) {
+      case 0:
+      case 2:
+        const res = await deployAppApi({
+          appId: appId.value as unknown as number,
+        })
 
-    if (res.data.code === 0 && res.data.data) {
-      deployUrl.value = res.data.data
-      deployModalVisible.value = true
-      message.success('部署成功')
-    } else {
-      message.error('部署失败：' + res.data.message)
+        if (res.data.code === 0 && res.data.data) {
+          deployUrl.value = res.data.data
+          deployModalVisible.value = true
+          message.success('部署成功')
+        } else {
+          message.error('部署失败：' + res.data.message)
+        }
+        break
+      case 1:
+        message.info("应用部署下线待实现")
+        break
     }
   } catch (error) {
     console.error('部署失败：', error)
@@ -813,6 +658,7 @@ const deployApp = async () => {
   }
 }
 
+// 导出 Markdown 聊天记录
 const exportToMarkdown = async () => {
   if (!appId.value) {
     message.error('应用ID不存在')
@@ -826,16 +672,17 @@ const exportToMarkdown = async () => {
     })
 
     if (res.data.code === 0 && res.data.data) {
-      const markdown = res.data.data
-      const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' })
-      const url = URL.createObjectURL(blob)
 
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `chat-history-${appId.value}.md`
-      link.click()
+      const markdown = res.data.data;
+      const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
 
-      URL.revokeObjectURL(url)
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `chat-history-${appId.value}.md`;
+      link.click();
+
+      URL.revokeObjectURL(url);
       message.success('导出成功')
     } else {
       message.error('导出失败：' + res.data.message)
@@ -908,10 +755,49 @@ const refreshPreview = () => {
   }
 }
 
+
+// 下载相关
+const downloading = ref(false)
+
 // 下载应用
-const downloadApp = () => {
-  message.info('下载功能（预留）')
+const downloadApp = async () => {
+  if (!appId.value) {
+    message.error('应用ID不存在')
+    return
+  }
+  downloading.value = true
+  try {
+    const API_BASE_URL = request.defaults.baseURL || ''
+    const url = `${API_BASE_URL}/app/download/${appId.value}`
+    const response = await fetch(url, {
+      method: 'GET',
+      credentials: 'include',
+    })
+    if (!response.ok) {
+      throw new Error(`下载失败: ${response.status}`)
+    }
+    // 获取文件名
+    const contentDisposition = response.headers.get('Content-Disposition')
+    const fileName = contentDisposition?.match(/filename="(.+)"/)?.[1] || `app-${appId.value}.zip`
+    // 下载文件
+    const blob = await response.blob()
+    const downloadUrl = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = downloadUrl
+    link.download = fileName
+    link.click()
+    // 清理
+    URL.revokeObjectURL(downloadUrl)
+    message.success('代码下载成功')
+  } catch (error) {
+    console.error('下载失败：', error)
+    message.error('下载失败，请重试')
+  } finally {
+    downloading.value = false
+  }
 }
+
+
 
 // 初始化页面
 const initPage = async () => {
@@ -928,8 +814,6 @@ const initPage = async () => {
   // 3. 如果有至少 2 条对话记录，展示对应的网站
   if (messages.value.length >= 2) {
     updatePreview()
-    // 同时加载代码内容
-    await fetchCodeContent()
   }
 
   // 4. 如果是自己的 app，并且没有对话历史，才自动将 initPrompt 作为第一条消息触发对话
@@ -998,6 +882,10 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.code-generate-type-tag {
+  font-size: 12px;
 }
 
 /* 头部中间 */
@@ -1096,12 +984,6 @@ onUnmounted(() => {
   padding: 16px;
   overflow-y: auto;
   scroll-behavior: smooth;
-}
-
-.load-more-container {
-  text-align: center;
-  padding: 12px 0;
-  margin-bottom: 16px;
 }
 
 .message-item {
@@ -1261,37 +1143,8 @@ onUnmounted(() => {
 
 /* 代码标签内容 */
 .code-content {
-  display: flex;
-  flex-direction: column;
-  padding: 0;
-  overflow: hidden;
-}
-
-.code-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  background: #f5f5f5;
-  border-bottom: 1px solid #e8e8e8;
-}
-
-.file-name {
-  font-size: 14px;
-  font-weight: 500;
-  color: #1a1a1a;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-}
-
-.code-editor-wrapper {
-  flex: 1;
-  overflow: hidden;
-  position: relative;
-}
-
-.code-editor-wrapper :deep(.ant-spin-nested-loading),
-.code-editor-wrapper :deep(.ant-spin-container) {
-  height: 100%;
+  padding: 16px;
+  /* background: #fafafa; */
 }
 
 .code-placeholder {
@@ -1316,6 +1169,36 @@ onUnmounted(() => {
   height: 100%;
   color: #999;
 }
+
+.editor-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.tabs {
+  display: flex;
+  padding: 6px;
+  user-select: none;
+}
+
+.tab {
+  padding: 6px 14px;
+  margin-right: 6px;
+  color: #94979D;
+  border-radius: 4px 4px 0 0;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.tab.active {
+  color: #000000;
+  background: #f4f5f7;
+  border-radius: 5px;
+  /* border-bottom: 2px solid #007acc; */
+}
+
+
 
 /* 响应式设计 */
 @media (max-width: 1024px) {

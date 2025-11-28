@@ -117,7 +117,7 @@ const loadMyApps = async () => {
 
     if (res.data.code === 0 && res.data.data) {
       myApps.value = res.data.data.records || []
-      myAppsPage.total = res.data.data.totalRow || 0
+      myAppsPage.total = Number.parseInt(res.data.data.totalRow as unknown as string) || 0
     }
   } catch (error) {
     console.error('加载我的应用失败：', error)
@@ -303,13 +303,14 @@ onMounted(() => {
               :app="app"
               @view-chat="viewChat"
               @view-work="viewWork"
+              :is-my-app="true"
             />
           </div>
           <div class="pagination-wrapper" v-if="myAppsPage.total > myAppsPage.pageSize">
             <a-pagination
-              v-model:current="myAppsPage.current"
-              v-model:page-size="myAppsPage.pageSize"
-              :total="myAppsPage.total"
+              v-model:current=myAppsPage.current
+              v-model:page-size=myAppsPage.pageSize
+              :total=myAppsPage.total
               :show-size-changer="false"
               :show-total="(total: number) => `共 ${total} 个应用`"
               @change="loadMyApps"

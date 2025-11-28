@@ -13,16 +13,23 @@
       </div>
     </div>
     <div class="app-info">
-      <div class="app-info-left">
-        <a-avatar :src="app.user?.userAvatar" :size="40">
+      <div class="app-info-left" v-if="!isMyApp">
+        <a-avatar :src="app.user?.avatar" :size="40">
           {{ app.user?.userName?.charAt(0) || 'U' }}
         </a-avatar>
       </div>
       <div class="app-info-right">
-        <h3 class="app-title">{{ app.appName || '未命名应用' }}</h3>
-        <p class="app-author">
-          {{ app.user?.userName || (featured ? '官方' : '未知用户') }}
-        </p>
+        <div class="app-info-inner-top">
+          <h3 class="app-title">{{ app.appName || '未命名应用' }}</h3>
+          <div class="app-tags">
+            <a-tag color="blue" v-for="(item, index) in app.tags" :key="index">{{ item }}</a-tag>
+          </div>
+        </div>
+        <div class="app-info-inner-bottom">
+          <p class="app-author" v-if="!isMyApp">
+            {{ app.user?.userName || (featured ? '官方' : '未知用户') }}
+          </p>
+        </div>
       </div>
     </div>
   </div>
@@ -31,6 +38,7 @@
 <script setup lang="ts">
 interface Props {
   app: API.AppVO
+  isMyApp?: boolean
   featured?: boolean
 }
 
@@ -126,6 +134,12 @@ const handleViewWork = () => {
 .app-info-right {
   flex: 1;
   min-width: 0;
+}
+
+.app-info-inner-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .app-title {
