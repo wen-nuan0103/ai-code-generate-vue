@@ -59,8 +59,14 @@
               </template>
               <i :class="btn.icon"></i>
             </a-tooltip>
-
             <!-- {{ btn.label }} -->
+          </a-button>
+          <a-button v-if="isOwner && previewUrl" type="link" :danger="isEditMode" @click="toggleEditMode"
+            :class="{ 'edit-mode-active': isEditMode }" style="padding: 0; height: auto; margin-right: 12px">
+            <template #icon>
+              <EditOutlined />
+            </template>
+            {{ isEditMode ? '退出编辑' : '编辑模式' }}
           </a-button>
         </div>
       </div>
@@ -78,7 +84,7 @@
         </a-button>
         <a-button class="deploy-button" @click="deployApp" :loading="deploying">
           <i class="ri-rocket-line"></i>
-          {{ appInfo?.deployStatus == 0 ? "部署" : appInfo?.deployStatus == 1 ? "下线" : "部署失败"}}
+          {{ appInfo?.deployStatus == 0 ? "部署" : appInfo?.deployStatus == 1 ? "下线" : "部署失败" }}
         </a-button>
       </div>
     </div>
@@ -116,6 +122,39 @@
             </div>
           </div>
         </div>
+
+        <!-- 选中元素信息展示 -->
+        <a-alert v-if="selectedElementInfo" class="selected-element-alert" type="info" closable
+          @close="clearSelectedElement">
+          <template #message>
+            <div class="selected-element-info">
+              <div class="element-header">
+                <span class="element-tag">
+                  选中元素：{{ selectedElementInfo.tagName.toLowerCase() }}
+                </span>
+                <span v-if="selectedElementInfo.id" class="element-id">
+                  #{{ selectedElementInfo.id }}
+                </span>
+                <span v-if="selectedElementInfo.className" class="element-class">
+                  .{{ selectedElementInfo.className.split(' ').join('.') }}
+                </span>
+              </div>
+              <div class="element-details">
+                <div v-if="selectedElementInfo.textContent" class="element-item">
+                  内容: {{ selectedElementInfo.textContent.substring(0, 50) }}
+                  {{ selectedElementInfo.textContent.length > 50 ? '...' : '' }}
+                </div>
+                <div v-if="selectedElementInfo.pagePath" class="element-item">
+                  页面路径: {{ selectedElementInfo.pagePath }}
+                </div>
+                <div class="element-item">
+                  选择器:
+                  <code class="element-selector-code">{{ selectedElementInfo.selector }}</code>
+                </div>
+              </div>
+            </div>
+          </template>
+        </a-alert>
 
         <!-- 底部输入框 -->
         <div class="input-container">
@@ -216,6 +255,7 @@ import {
   DownloadOutlined,
 } from '@ant-design/icons-vue'
 import { exportMarkdown, listAppChatHistory } from '@/api/chatHistoryController'
+import { VisualEditor, type ElementInfo } from '@/utils/visualEditor';
 
 const route = useRoute()
 const router = useRouter()
@@ -281,6 +321,16 @@ const historyLoaded = ref(false)
 // 预览相关
 const previewUrl = ref('')
 const previewReady = ref(false)
+
+
+// 可视化编辑相关
+const isEditMode = ref(false)
+const selectedElementInfo = ref<ElementInfo | null>(null)
+const visualEditor = new VisualEditor({
+  onElementSelected: (elementInfo: ElementInfo) => {
+    selectedElementInfo.value = elementInfo
+  },
+})
 
 // 部署相关
 const deploying = ref(false)
@@ -442,7 +492,19 @@ const sendMessage = async () => {
     return
   }
 
-  const message = userInput.value.trim()
+  let message = userInput.value.trim()
+  // 如果有选中的元素，将元素信息添加到提示词中
+  if (selectedElementInfo.value) {
+    let elementContext = `\n\n选中元素信息：`
+    if (selectedElementInfo.value.pagePath) {
+      elementContext += `\n- 页面路径: ${selectedElementInfo.value.pagePath}`
+    }
+    elementContext += `\n- 标签: ${selectedElementInfo.value.tagName.toLowerCase()}\n- 选择器: ${selectedElementInfo.value.selector}`
+    if (selectedElementInfo.value.textContent) {
+      elementContext += `\n- 当前内容: ${selectedElementInfo.value.textContent.substring(0, 100)}`
+    }
+    message += elementContext
+  }
   userInput.value = ''
 
   // 添加用户消息
@@ -450,6 +512,15 @@ const sendMessage = async () => {
     type: 'user',
     content: message,
   })
+
+  // 发送消息后，清除选中元素并退出编辑模式
+  if (selectedElementInfo.value) {
+    clearSelectedElement()
+    if (isEditMode.value) {
+      toggleEditMode()
+    }
+  }
+
 
   // 添加AI消息占位符
   const aiMessageIndex = messages.value.length
@@ -631,7 +702,7 @@ const deployApp = async () => {
 
   deploying.value = true
   try {
-    switch(appInfo.value?.deployStatus) {
+    switch (appInfo.value?.deployStatus) {
       case 0:
       case 2:
         const res = await deployAppApi({
@@ -712,6 +783,11 @@ const openDeployedSite = () => {
 // iframe加载完成
 const onIframeLoad = () => {
   previewReady.value = true
+  const iframe = document.querySelector('.preview-iframe') as HTMLIFrameElement
+  if (iframe) {
+    visualEditor.init(iframe)
+    visualEditor.onIframeLoad()
+  }
 }
 
 // 编辑应用
@@ -828,13 +904,49 @@ const initPage = async () => {
   }
 }
 
+// 可视化编辑相关函数
+const toggleEditMode = () => {
+  // 检查 iframe 是否已经加载
+  const iframe = document.querySelector('.preview-iframe') as HTMLIFrameElement
+  if (!iframe) {
+    message.warning('请等待页面加载完成')
+    return
+  }
+  // 确保 visualEditor 已初始化
+  if (!previewReady.value) {
+    message.warning('请等待页面加载完成')
+    return
+  }
+  const newEditMode = visualEditor.toggleEditMode()
+  isEditMode.value = newEditMode
+}
+
+const clearSelectedElement = () => {
+  selectedElementInfo.value = null
+  visualEditor.clearSelection()
+}
+
+const getInputPlaceholder = () => {
+  if (selectedElementInfo.value) {
+    return `正在编辑 ${selectedElementInfo.value.tagName.toLowerCase()} 元素，描述您想要的修改...`
+  }
+  return '请描述你想生成的网站，越详细效果越好哦'
+}
+
+
 // 页面加载时初始化
+const handleIframeMessage = (event: MessageEvent) => {
+  visualEditor.handleIframeMessage(event)
+}
+
 onMounted(() => {
   initPage()
+  window.addEventListener('message', handleIframeMessage)
 })
 
 // 清理资源
 onUnmounted(() => {
+  window.removeEventListener('message', handleIframeMessage)
   // EventSource 会在组件卸载时自动清理
 })
 </script>
@@ -1141,6 +1253,10 @@ onUnmounted(() => {
   border: none;
 }
 
+.selected-element-alert {
+  margin: 0 16px;
+}
+
 /* 代码标签内容 */
 .code-content {
   padding: 16px;
@@ -1257,6 +1373,71 @@ onUnmounted(() => {
 
   .header-right {
     flex-wrap: wrap;
+  }
+
+  /* 选中元素信息样式 */
+  .selected-element-alert {
+    margin: 0 16px;
+  }
+
+  .selected-element-info {
+    line-height: 1.4;
+  }
+
+  .element-header {
+    margin-bottom: 8px;
+  }
+
+  .element-details {
+    margin-top: 8px;
+  }
+
+  .element-item {
+    margin-bottom: 4px;
+    font-size: 13px;
+  }
+
+  .element-item:last-child {
+    margin-bottom: 0;
+  }
+
+  .element-tag {
+    font-family: 'Monaco', 'Menlo', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    color: #007bff;
+  }
+
+  .element-id {
+    color: #28a745;
+    margin-left: 4px;
+  }
+
+  .element-class {
+    color: #ffc107;
+    margin-left: 4px;
+  }
+
+  .element-selector-code {
+    font-family: 'Monaco', 'Menlo', monospace;
+    background: #f6f8fa;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-size: 12px;
+    color: #d73a49;
+    border: 1px solid #e1e4e8;
+  }
+
+  /* 编辑模式按钮样式 */
+  .edit-mode-active {
+    background-color: #52c41a !important;
+    border-color: #52c41a !important;
+    color: white !important;
+  }
+
+  .edit-mode-active:hover {
+    background-color: #73d13d !important;
+    border-color: #73d13d !important;
   }
 }
 </style>
