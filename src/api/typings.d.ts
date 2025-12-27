@@ -121,6 +121,7 @@ declare namespace API {
 
   type ChatHistory = {
     id?: number
+    thinkingContent?: string
     message?: string
     messageType?: string
     parentId?: number

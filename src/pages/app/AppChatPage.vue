@@ -108,18 +108,47 @@
                 <a-avatar :src="userStore.user.avatar" />
               </div>
             </div>
-            <div v-else class="ai-message">
+              <div v-else class="ai-message">
               <div class="message-avatar">
                 <a-avatar :src="aiAvatar" />
               </div>
               <div class="message-content">
-                <MarkdownRenderer v-if="message.content" :content="message.content" />
-                <div v-if="message.loading" class="loading-indicator">
-                  <a-spin size="small" />
-                  <span>AI 正在思考...</span>
+                <div v-if="message.workflowSteps && message.workflowSteps.length > 0" class="workflow-box">
+                <div class="workflow-header" @click="message.isThinkingExpanded = !message.isThinkingExpanded">
+                  <div class="header-left">
+                    <a-spin v-if="message.loading" size="small" style="margin-right: 6px"/>
+                    <i v-else class="ri-checkbox-circle-fill" style="color: #52c41a; margin-right: 6px;"></i>
+                    
+                    <span class="status-text">{{ message.workflowStatus || 'AI 思考过程' }}</span>
+                    <span class="step-count" v-if="!message.loading"> (共 {{ message.workflowSteps.length }} 步)</span>
+                  </div>
+                  <i class="ri-arrow-down-s-line arrow-icon" :class="{ 'expanded': message.isThinkingExpanded }"></i>
+                </div>
+
+                <div v-if="message.isThinkingExpanded" class="workflow-body">
+                  <div v-for="(step, idx) in message.workflowSteps" :key="idx" class="step-item">
+                    <div class="step-indicator">
+                        <div class="step-line" v-if="idx !== message.workflowSteps.length - 1"></div>
+                        <div class="step-dot" :class="step.type"></div>
+                    </div>
+                    
+                    <div class="step-content">
+                        <div class="step-title">{{ step.content }}</div>
+                        <div v-if="step.type === 'reasoning' && step.extendedContent" class="reasoning-text">
+                          {{ step.extendedContent }}
+                        </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+                <MarkdownRenderer v-if="message.content" :content="message.content" />
+                
+                <div v-if="message.loading || message.workflowStatus" class="loading-indicator">
+                  <a-spin v-if="message.loading" size="small" />
+                  <span>{{ message.workflowStatus || 'AI 正在思考...' }}</span>
+                </div>
+              </div>
+            </div>  
           </div>
         </div>
 
@@ -268,12 +297,26 @@ const appId = ref<string>()
 // 标签切换状态
 const activeTab = ref<'display' | 'code' | 'settings'>('display')
 
+// 工作流阶段步骤
+interface WorkflowStep {
+  step: number
+  content: string
+  type: string
+  extendedContent?: string
+}
+
 // 对话相关
 interface Message {
   type: 'user' | 'ai'
   content: string
   loading?: boolean
+  workflowStatus?: string
+  // 步骤列表
+  workflowSteps?: WorkflowStep[]
+  // 是否展开详情
+  isThinkingExpanded?: boolean
 }
+
 const messages = ref<Message[]>([])
 const userInput = ref('')
 const isGenerating = ref(false)
@@ -382,6 +425,7 @@ const showAppDetail = () => {
 }
 
 // 加载对话历史
+// 加载对话历史
 const loadChatHistory = async (isLoadMore = false) => {
   if (!appId.value || loadingHistory.value) return
   loadingHistory.value = true
@@ -398,11 +442,45 @@ const loadChatHistory = async (isLoadMore = false) => {
     if (res.data.code === 0 && res.data.data) {
       const chatHistories = res.data.data.records || []
       if (chatHistories.length > 0) {
-        // 需要反转数组，让老消息在前
-        const historyMessages: Message[] = chatHistories.reverse().map((chat) => ({
-          type: (chat.messageType === 'user' ? 'user' : 'ai') as 'user' | 'ai',
-          content: chat.message || '',
-        }))
+        // 需要反转数组，让老消息在前 (后端通常返回按时间降序)
+        const historyMessages: Message[] = chatHistories.reverse().map((chat) => {
+          
+          // === 1. 解析思考过程 (Thinking Content) ===
+          let restoredSteps: WorkflowStep[] = []
+          let statusText = undefined
+
+          if (chat.thinkingContent) {
+            try {
+              // 尝试解析 JSON 字符串
+              const steps = JSON.parse(chat.thinkingContent)
+              if (Array.isArray(steps)) {
+                // 映射为前端 WorkflowStep 结构
+                restoredSteps = steps.map((s: any) => ({
+                    step: s.step,
+                    content: s.content,
+                    type: s.type,
+                    extendedContent: s.extendedContent // 包含 DeepSeek 的详细思考
+                }))
+                // 如果存在步骤，状态标记为完成
+                statusText = '生成完成'
+              }
+            } catch (e) {
+              console.error('解析历史思考过程失败', e)
+            }
+          }
+
+          const typeStr = String(chat.messageType);
+          const isUser = typeStr === 'user' || typeStr === '1';
+          // === 2. 构造消息对象 ===
+          return {
+            type: isUser ? 'user' : 'ai',
+            content: chat.message || '',
+            loading: false, 
+            workflowSteps: restoredSteps,
+            workflowStatus: statusText,
+            isThinkingExpanded: false
+          }
+        })
 
         if (isLoadMore) {
           // 加载更多时，将历史消息添加到开头
@@ -411,11 +489,7 @@ const loadChatHistory = async (isLoadMore = false) => {
           // 初始加载，直接设置消息列表
           messages.value = historyMessages
         }
-
-        // 更新游标：因为后端返回的是降序，所以最后一条（反转前）是最老的
-        // 反转后，chatHistories[0] 是最老的
         lastCreateTime.value = chatHistories[0]?.createTime
-
         // 检查是否还有更多历史
         hasMoreHistory.value = chatHistories.length === 10
       } else {
@@ -430,7 +504,6 @@ const loadChatHistory = async (isLoadMore = false) => {
     loadingHistory.value = false
   }
 }
-
 // 加载更多历史消息
 const loadMoreHistory = async () => {
   await loadChatHistory(true)
@@ -564,15 +637,58 @@ const generateCode = async (userMessage: string, aiMessageIndex: number) => {
 
       try {
         const parsed = JSON.parse(event.data)
-        const content = parsed.d
+        const rawChunk = parsed.d
 
-        // 拼接内容
-        if (content !== undefined && content !== null) {
-          fullContent += content
+        if (rawChunk !== undefined && rawChunk !== null) {
           const aiMessage = messages.value[aiMessageIndex]
-          if (aiMessage) {
+          if (!aiMessage) return
+
+          // 初始化数组
+          if (!aiMessage.workflowSteps) {
+             aiMessage.workflowSteps = []
+             aiMessage.isThinkingExpanded = false
+          }
+
+          let isWorkflowEvent = false
+
+          try {
+            const trimmedChunk = rawChunk.trim()
+            // 简单的预检查，避免对每一行代码都进行 JSON.parse
+            if (trimmedChunk.startsWith('{') && trimmedChunk.endsWith('}')) {
+              const chunkObj = JSON.parse(trimmedChunk)
+              
+              // 检查是否包含特定的工作流字段 type，且值在预定义范围内
+              if (chunkObj && chunkObj.type && ['start', 'processing', 'finish', 'error'].includes(chunkObj.type)) {
+                isWorkflowEvent = true
+
+                  const lastStep = aiMessage.workflowSteps[aiMessage.workflowSteps.length - 1]
+                  if (!lastStep || lastStep.content !== chunkObj.content) {
+                      aiMessage.workflowSteps.push({
+                          step: chunkObj.step,
+                          content: chunkObj.content,
+                          type: chunkObj.type
+                      })
+                  }
+
+                  // 是工作流状态消息
+                  if (chunkObj.type === 'finish') {
+                      aiMessage.workflowStatus = '生成完成'
+                  } else if (chunkObj.type === 'error') {
+                      aiMessage.workflowStatus = '执行出错'
+                  } else {
+                      aiMessage.workflowStatus = chunkObj.content
+                      aiMessage.loading = true
+                  }
+              }
+            }
+          } catch (e) {}
+
+          // 是普通代码/文本片段
+          if (!isWorkflowEvent) {
+            const cleanChunk = rawChunk.replace(/<think>[\s\S]*?<\/think>/g, '')
+            fullContent += cleanChunk
             aiMessage.content = fullContent
-            aiMessage.loading = false
+            // 收到代码内容时，保持 loading 为 true，直到流结束
           }
           scrollToBottom()
         }
@@ -582,14 +698,22 @@ const generateCode = async (userMessage: string, aiMessageIndex: number) => {
       }
     }
 
-    // 处理done事件
+    // 处理 done 事件 (流结束)
     eventSource.addEventListener('done', function () {
       if (streamCompleted) return
 
       streamCompleted = true
+      
+      // 确保最后状态正确
+      const aiMessage = messages.value[aiMessageIndex]
+      if (aiMessage) {
+        aiMessage.loading = false
+      }
+
       isGenerating.value = false
       eventSource?.close()
 
+      // 延迟刷新预览，确保后端构建文件已完全写入
       setTimeout(async () => {
         await fetchAppInfo()
         updatePreview()
@@ -599,10 +723,16 @@ const generateCode = async (userMessage: string, aiMessageIndex: number) => {
     // 处理错误
     eventSource.onerror = function () {
       if (streamCompleted || !isGenerating.value) return
-      // 检查是否是正常的连接关闭
+      
+      // 检查是否是正常的连接关闭 (某些浏览器/服务端实现可能会触发这个)
       if (eventSource?.readyState === EventSource.CONNECTING) {
+        // 视为连接中断或结束
         streamCompleted = true
         isGenerating.value = false
+        
+        const aiMessage = messages.value[aiMessageIndex]
+        if (aiMessage) aiMessage.loading = false
+
         eventSource?.close()
 
         setTimeout(async () => {
@@ -610,7 +740,9 @@ const generateCode = async (userMessage: string, aiMessageIndex: number) => {
           updatePreview()
         }, 1000)
       } else {
+        // 真正的错误
         handleError(new Error('SSE连接错误'), aiMessageIndex)
+        eventSource?.close()
       }
     }
   } catch (error) {
@@ -1144,6 +1276,116 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   color: #666;
+}
+
+/* 思考过程容器 */
+.workflow-box {
+  margin-bottom: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background-color: #f9fafb;
+  overflow: hidden;
+  font-size: 13px;
+}
+
+.workflow-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  background: #f3f4f6;
+  color: #374151;
+  user-select: none;
+  transition: background 0.2s;
+}
+.workflow-header:hover {
+  background: #e5e7eb;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+}
+
+.status-text {
+  font-weight: 500;
+}
+.step-count {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-left: 4px;
+}
+
+.arrow-icon {
+  transition: transform 0.2s;
+  color: #6b7280;
+}
+.arrow-icon.expanded {
+  transform: rotate(180deg);
+}
+
+.workflow-body {
+  padding: 12px;
+  background: #fff;
+  border-top: 1px solid #e5e7eb;
+}
+
+.step-item {
+  display: flex;
+  position: relative;
+  padding-bottom: 16px;
+}
+.step-item:last-child {
+  padding-bottom: 0;
+}
+
+.step-indicator {
+  margin-right: 12px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 12px;
+}
+
+.step-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d1d5db; /* 默认灰色 */
+  z-index: 2;
+  margin-top: 4px;
+}
+.step-dot.processing { background: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.2); }
+.step-dot.finish { background: #10b981; }
+.step-dot.error { background: #ef4444; }
+.step-dot.reasoning { background: #8b5cf6; } /* 紫色表示思考 */
+
+.step-line {
+  position: absolute;
+  top: 12px;
+  bottom: -20px;
+  width: 1px;
+  background: #e5e7eb;
+  z-index: 1;
+}
+
+.step-content {
+  flex: 1;
+}
+.step-title {
+  color: #4b5563;
+}
+.reasoning-text {
+  margin-top: 4px;
+  padding: 8px;
+  background: #f3f4f6;
+  border-radius: 4px;
+  color: #6b7280;
+  font-family: monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
 }
 
 /* 输入区域 */
