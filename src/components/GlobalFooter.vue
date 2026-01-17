@@ -108,7 +108,7 @@ const socialLinks = ref([
       <!-- 底部版权信息 -->
       <div class="footer-bottom">
         <div class="footer-copyright">
-          <p>©2025 美图版权所有</p>
+          <p>©2025 小菜版权所有</p>
           <div class="footer-meta">
             <a href="#" target="_blank" rel="noopener noreferrer"> 京ICP备15052537号-11 </a>
             <span class="separator">|</span>
@@ -116,7 +116,7 @@ const socialLinks = ref([
               <span class="badge">🛡️</span> 京公网安备11010502056975号
             </a>
             <span class="separator">|</span>
-            <span>作品内容 AI 生成</span>
+            <span></span>
           </div>
         </div>
       </div>
@@ -129,7 +129,7 @@ const socialLinks = ref([
   background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
   padding: 60px 0 0 0;
   /* border-top: 1px solid #e2e8f0; */
-  margin-top: 80px;
+  /* margin-top: 80px; */
   z-index: 100;
 }
 

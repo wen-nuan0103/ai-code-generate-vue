@@ -1,8 +1,6 @@
 <template>
   <div id="appChatPage">
-    <!-- 自定义头部区域 -->
     <div class="custom-header">
-      <!-- 左侧：用户头像 + 项目名称 + 下拉箭头 -->
       <div class="header-left">
         <a-avatar :src="userStore.user.avatar" :size="36" />
         <div class="project-name-container">
@@ -33,7 +31,6 @@
         </div>
       </div>
 
-      <!-- 中间：功能按钮组 -->
       <div class="header-center">
         <div class="tab-buttons">
           <a-button class="tab-button" :type="activeTab === 'display' ? 'primary' : 'default'"
@@ -49,7 +46,6 @@
           </a-button>
         </div>
 
-        <!-- 功能按钮区域（仅在"显示"标签时显示） -->
         <div class="action-buttons" :class="{ 'hidden-placeholder': activeTab !== 'display' }">
           <a-button class="tab-button" v-for="btn in actionButtons" :key="btn.key" @click="btn.handler"
             :loading="btn.loading">
@@ -59,7 +55,6 @@
               </template>
               <i :class="btn.icon"></i>
             </a-tooltip>
-            <!-- {{ btn.label }} -->
           </a-button>
           <a-button v-if="isOwner && previewUrl" type="link" :danger="isEditMode" @click="toggleEditMode"
             :class="{ 'edit-mode-active': isEditMode }" style="padding: 0; height: auto; margin-right: 12px">
@@ -71,7 +66,6 @@
         </div>
       </div>
 
-      <!-- 右侧：下载 + 部署按钮 -->
       <div class="header-right">
         <a-button @click="downloadApp" :loading="downloading" :disabled="!isOwner">
           <template #icon>
@@ -84,18 +78,23 @@
         </a-button>
         <a-button class="deploy-button" @click="deployApp" :loading="deploying">
           <i class="ri-rocket-line"></i>
-          {{ appInfo?.deployStatus == 0 ? "部署" : appInfo?.deployStatus == 1 ? "下线" : "部署失败" }}
+          {{
+            appInfo?.deployStatus == 0 ? '部署' : appInfo?.deployStatus == 1 ? '下线' : '部署失败'
+          }}
         </a-button>
       </div>
     </div>
 
-    <!-- 主要内容区域 -->
     <div class="main-content">
-      <!-- 左侧：聊天区域 -->
       <div class="chat-section">
-        <!-- 消息区域（可滚动） -->
-        <div class="messages-container" ref="messagesContainer">
-          <!-- 加载更多按钮 -->
+        <transition name="fade">
+          <div v-if="showScrollBottomBtn" class="scroll-bottom-btn" @click="scrollToBottomSmooth">
+            <VerticalAlignBottomOutlined />
+            <span class="new-msg-tip" v-if="isGenerating">新消息</span>
+          </div>
+        </transition>
+
+        <div class="messages-container" ref="messagesContainer" @scroll="handleScroll">
           <div v-if="hasMoreHistory" class="load-more-container">
             <a-button type="link" @click="loadMoreHistory" :loading="loadingHistory" size="small">
               加载更多历史消息
@@ -108,51 +107,51 @@
                 <a-avatar :src="userStore.user.avatar" />
               </div>
             </div>
-              <div v-else class="ai-message">
+            <div v-else class="ai-message">
               <div class="message-avatar">
                 <a-avatar :src="aiAvatar" />
               </div>
               <div class="message-content">
                 <div v-if="message.workflowSteps && message.workflowSteps.length > 0" class="workflow-box">
-                <div class="workflow-header" @click="message.isThinkingExpanded = !message.isThinkingExpanded">
-                  <div class="header-left">
-                    <a-spin v-if="message.loading" size="small" style="margin-right: 6px"/>
-                    <i v-else class="ri-checkbox-circle-fill" style="color: #52c41a; margin-right: 6px;"></i>
-                    
-                    <span class="status-text">{{ message.workflowStatus || 'AI 思考过程' }}</span>
-                    <span class="step-count" v-if="!message.loading"> (共 {{ message.workflowSteps.length }} 步)</span>
-                  </div>
-                  <i class="ri-arrow-down-s-line arrow-icon" :class="{ 'expanded': message.isThinkingExpanded }"></i>
-                </div>
+                  <div class="workflow-header" @click="message.isThinkingExpanded = !message.isThinkingExpanded">
+                    <div class="header-left">
+                      <a-spin v-if="message.loading" size="small" style="margin-right: 6px" />
+                      <i v-else class="ri-checkbox-circle-fill" style="color: #52c41a; margin-right: 6px"></i>
 
-                <div v-if="message.isThinkingExpanded" class="workflow-body">
-                  <div v-for="(step, idx) in message.workflowSteps" :key="idx" class="step-item">
-                    <div class="step-indicator">
+                      <span class="status-text">{{ message.workflowStatus || '思考过程' }}</span>
+                      <span class="step-count" v-if="!message.loading">
+                        (共 {{ message.workflowSteps.length }} 步)</span>
+                    </div>
+                    <i class="ri-arrow-down-s-line arrow-icon" :class="{ expanded: message.isThinkingExpanded }"></i>
+                  </div>
+
+                  <div v-if="message.isThinkingExpanded" class="workflow-body">
+                    <div v-for="(step, idx) in message.workflowSteps" :key="idx" class="step-item">
+                      <div class="step-indicator">
                         <div class="step-line" v-if="idx !== message.workflowSteps.length - 1"></div>
                         <div class="step-dot" :class="step.type"></div>
-                    </div>
-                    
-                    <div class="step-content">
+                      </div>
+
+                      <div class="step-content">
                         <div class="step-title">{{ step.content }}</div>
                         <div v-if="step.type === 'reasoning' && step.extendedContent" class="reasoning-text">
                           {{ step.extendedContent }}
                         </div>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
                 <MarkdownRenderer v-if="message.content" :content="message.content" />
-                
+
                 <div v-if="message.loading || message.workflowStatus" class="loading-indicator">
                   <a-spin v-if="message.loading" size="small" />
-                  <span>{{ message.workflowStatus || 'AI 正在思考...' }}</span>
+                  <span>{{ message.workflowStatus || '正在思考...' }}</span>
                 </div>
               </div>
-            </div>  
+            </div>
           </div>
         </div>
 
-        <!-- 选中元素信息展示 -->
         <a-alert v-if="selectedElementInfo" class="selected-element-alert" type="info" closable
           @close="clearSelectedElement">
           <template #message>
@@ -185,7 +184,6 @@
           </template>
         </a-alert>
 
-        <!-- 底部输入框 -->
         <div class="input-container">
           <div class="input-wrapper">
             <a-tooltip v-if="!isOwner" title="无法在别人的作品下对话哦~" placement="top">
@@ -206,25 +204,21 @@
         </div>
       </div>
 
-      <!-- 右侧：内容展示区域（根据选中的标签切换） -->
       <div class="content-section">
-        <!-- 显示标签内容 -->
         <div v-if="activeTab === 'display'" class="tab-content display-content">
-          <div v-if="!previewUrl && !isGenerating" class="preview-placeholder">
+          <div v-if="!previewUrl && !isCodeGenerating" class="preview-placeholder">
             <div class="placeholder-icon">🌐</div>
             <p>网站文件生成完成后将在这里展示</p>
           </div>
-          <div v-else-if="isGenerating" class="preview-loading">
+          <div v-else-if="isCodeGenerating" class="preview-loading">
             <a-spin size="large" />
             <p>正在生成网站...</p>
           </div>
           <iframe v-else :src="previewUrl" class="preview-iframe" frameborder="0" @load="onIframeLoad"></iframe>
         </div>
 
-        <!-- 代码标签内容 -->
         <div v-else-if="activeTab === 'code'" class="tab-content code-content">
           <div class="editor-container">
-            <!-- Tabs -->
             <div class="tabs">
               <div v-for="f in files" :key="f.id" class="tab" :class="{ active: f.id === activeFileId }"
                 @click="switchFile(f.id)">
@@ -236,7 +230,6 @@
           </div>
         </div>
 
-        <!-- 设置标签内容 -->
         <div v-else-if="activeTab === 'settings'" class="tab-content settings-content">
           <div class="settings-placeholder">
             <div class="placeholder-icon">⚙️</div>
@@ -246,11 +239,9 @@
       </div>
     </div>
 
-    <!-- 应用详情弹窗 -->
     <AppDetailModal v-model:open="appDetailVisible" :app="appInfo" :show-actions="isOwner || isAdmin" @edit="editApp"
       @delete="deleteApp" />
 
-    <!-- 部署成功弹窗 -->
     <DeploySuccessModal v-model:open="deployModalVisible" :deploy-url="deployUrl" @open-site="openDeployedSite" />
   </div>
 </template>
@@ -259,8 +250,8 @@
 import { ref, onMounted, nextTick, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
-import * as monaco from "monaco-editor";
-import { CodeEditor } from 'monaco-editor-vue3';
+import * as monaco from 'monaco-editor'
+import { CodeEditor } from 'monaco-editor-vue3'
 import { useUserStore } from '@/stores/user'
 import {
   getAppVoById,
@@ -282,9 +273,10 @@ import {
   EditOutlined,
   DeleteOutlined,
   DownloadOutlined,
+  VerticalAlignBottomOutlined, // 已添加引入
 } from '@ant-design/icons-vue'
 import { exportMarkdown, listAppChatHistory } from '@/api/chatHistoryController'
-import { VisualEditor, type ElementInfo } from '@/utils/visualEditor';
+import { VisualEditor, type ElementInfo } from '@/utils/visualEditor'
 
 const route = useRoute()
 const router = useRouter()
@@ -320,40 +312,40 @@ interface Message {
 const messages = ref<Message[]>([])
 const userInput = ref('')
 const isGenerating = ref(false)
+const isCodeGenerating = ref(false) // 是否正在生成代码
+const isChatting = ref(false) // 是否正在普通聊天
 const messagesContainer = ref<HTMLElement>()
 const hasInitialConversation = ref(false) // 标记是否已经进行过初始对话
 
-const code = ref("");
-const language = ref("javascript")
+const code = ref('')
+const language = ref('javascript')
 const files = ref([
   {
-    id: "file1",
-    name: "index.js",
+    id: 'file1',
+    name: 'index.js',
     value: `function hello() {\n  console.log("Hello World");\n}`,
   },
   {
-    id: "file2",
-    name: "style.css",
+    id: 'file2',
+    name: 'style.css',
     value: `body {\n  background: #f2f2f2;\n}`,
   },
   {
-    id: "file3",
-    name: "README.md",
+    id: 'file3',
+    name: 'README.md',
     value: `# Project\n\nThis is a multi-file Monaco editor.`,
   },
-]);
-const activeFileId = ref("file1");
-const models = new Map();
+])
+const activeFileId = ref('file1')
+const models = new Map()
 
 const editorOptions = {
   readOnly: false,
   minimap: { enabled: true },
   fontSize: 14,
-  wordWrap: "on",
+  wordWrap: 'on',
   automaticLayout: true,
-};
-
-
+}
 
 // 对话历史相关
 const loadingHistory = ref(false)
@@ -364,7 +356,6 @@ const historyLoaded = ref(false)
 // 预览相关
 const previewUrl = ref('')
 const previewReady = ref(false)
-
 
 // 可视化编辑相关
 const isEditMode = ref(false)
@@ -425,7 +416,6 @@ const showAppDetail = () => {
 }
 
 // 加载对话历史
-// 加载对话历史
 const loadChatHistory = async (isLoadMore = false) => {
   if (!appId.value || loadingHistory.value) return
   loadingHistory.value = true
@@ -444,7 +434,6 @@ const loadChatHistory = async (isLoadMore = false) => {
       if (chatHistories.length > 0) {
         // 需要反转数组，让老消息在前 (后端通常返回按时间降序)
         const historyMessages: Message[] = chatHistories.reverse().map((chat) => {
-          
           // === 1. 解析思考过程 (Thinking Content) ===
           let restoredSteps: WorkflowStep[] = []
           let statusText = undefined
@@ -456,10 +445,10 @@ const loadChatHistory = async (isLoadMore = false) => {
               if (Array.isArray(steps)) {
                 // 映射为前端 WorkflowStep 结构
                 restoredSteps = steps.map((s: any) => ({
-                    step: s.step,
-                    content: s.content,
-                    type: s.type,
-                    extendedContent: s.extendedContent // 包含 DeepSeek 的详细思考
+                  step: s.step,
+                  content: s.content,
+                  type: s.type,
+                  extendedContent: s.extendedContent, // 包含 DeepSeek 的详细思考
                 }))
                 // 如果存在步骤，状态标记为完成
                 statusText = '生成完成'
@@ -469,16 +458,16 @@ const loadChatHistory = async (isLoadMore = false) => {
             }
           }
 
-          const typeStr = String(chat.messageType);
-          const isUser = typeStr === 'user' || typeStr === '1';
+          const typeStr = String(chat.messageType)
+          const isUser = typeStr === 'user' || typeStr === '1'
           // === 2. 构造消息对象 ===
           return {
             type: isUser ? 'user' : 'ai',
             content: chat.message || '',
-            loading: false, 
+            loading: false,
             workflowSteps: restoredSteps,
             workflowStatus: statusText,
-            isThinkingExpanded: false
+            isThinkingExpanded: false,
           }
         })
 
@@ -488,6 +477,19 @@ const loadChatHistory = async (isLoadMore = false) => {
         } else {
           // 初始加载，直接设置消息列表
           messages.value = historyMessages
+          await nextTick()
+          if (messagesContainer.value) {
+            // 1. 临时强制关闭平滑滚动 (设为 auto)
+            messagesContainer.value.style.scrollBehavior = 'auto'
+            // 2. 执行滚动 (瞬间完成)
+            messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+            // 3. 恢复平滑滚动
+            setTimeout(() => {
+              if (messagesContainer.value) {
+                messagesContainer.value.style.scrollBehavior = ''
+              }
+            }, 0)
+          }
         }
         lastCreateTime.value = chatHistories[0]?.createTime
         // 检查是否还有更多历史
@@ -594,7 +596,6 @@ const sendMessage = async () => {
     }
   }
 
-
   // 添加AI消息占位符
   const aiMessageIndex = messages.value.length
   messages.value.push({
@@ -643,10 +644,36 @@ const generateCode = async (userMessage: string, aiMessageIndex: number) => {
           const aiMessage = messages.value[aiMessageIndex]
           if (!aiMessage) return
 
+          try {
+            const trimmedChunk = rawChunk.trim()
+            if (trimmedChunk.startsWith('{') && trimmedChunk.endsWith('}')) {
+              const chunkObj = JSON.parse(trimmedChunk)
+
+              // 检测元数据消息
+              if (chunkObj.type === 'metadata') {
+                const isCodeGen = chunkObj.isCodeGeneration
+
+                // 根据类型设置不同的状态
+                if (isCodeGen) {
+                  isCodeGenerating.value = true
+                  isChatting.value = false
+                } else {
+                  isCodeGenerating.value = false
+                  isChatting.value = true
+                }
+
+                // 元数据不需要显示，直接返回
+                return
+              }
+            }
+          } catch (e) {
+            // 解析失败，继续处理
+          }
+
           // 初始化数组
           if (!aiMessage.workflowSteps) {
-             aiMessage.workflowSteps = []
-             aiMessage.isThinkingExpanded = false
+            aiMessage.workflowSteps = []
+            aiMessage.isThinkingExpanded = false
           }
 
           let isWorkflowEvent = false
@@ -656,32 +683,36 @@ const generateCode = async (userMessage: string, aiMessageIndex: number) => {
             // 简单的预检查，避免对每一行代码都进行 JSON.parse
             if (trimmedChunk.startsWith('{') && trimmedChunk.endsWith('}')) {
               const chunkObj = JSON.parse(trimmedChunk)
-              
+
               // 检查是否包含特定的工作流字段 type，且值在预定义范围内
-              if (chunkObj && chunkObj.type && ['start', 'processing', 'finish', 'error'].includes(chunkObj.type)) {
+              if (
+                chunkObj &&
+                chunkObj.type &&
+                ['start', 'processing', 'finish', 'error'].includes(chunkObj.type)
+              ) {
                 isWorkflowEvent = true
 
-                  const lastStep = aiMessage.workflowSteps[aiMessage.workflowSteps.length - 1]
-                  if (!lastStep || lastStep.content !== chunkObj.content) {
-                      aiMessage.workflowSteps.push({
-                          step: chunkObj.step,
-                          content: chunkObj.content,
-                          type: chunkObj.type
-                      })
-                  }
+                const lastStep = aiMessage.workflowSteps[aiMessage.workflowSteps.length - 1]
+                if (!lastStep || lastStep.content !== chunkObj.content) {
+                  aiMessage.workflowSteps.push({
+                    step: chunkObj.step,
+                    content: chunkObj.content,
+                    type: chunkObj.type,
+                  })
+                }
 
-                  // 是工作流状态消息
-                  if (chunkObj.type === 'finish') {
-                      aiMessage.workflowStatus = '生成完成'
-                  } else if (chunkObj.type === 'error') {
-                      aiMessage.workflowStatus = '执行出错'
-                  } else {
-                      aiMessage.workflowStatus = chunkObj.content
-                      aiMessage.loading = true
-                  }
+                // 是工作流状态消息
+                if (chunkObj.type === 'finish') {
+                  aiMessage.workflowStatus = '生成完成'
+                } else if (chunkObj.type === 'error') {
+                  aiMessage.workflowStatus = '执行出错'
+                } else {
+                  aiMessage.workflowStatus = chunkObj.content
+                  aiMessage.loading = true
+                }
               }
             }
-          } catch (e) {}
+          } catch (e) { }
 
           // 是普通代码/文本片段
           if (!isWorkflowEvent) {
@@ -703,7 +734,7 @@ const generateCode = async (userMessage: string, aiMessageIndex: number) => {
       if (streamCompleted) return
 
       streamCompleted = true
-      
+
       // 确保最后状态正确
       const aiMessage = messages.value[aiMessageIndex]
       if (aiMessage) {
@@ -711,13 +742,23 @@ const generateCode = async (userMessage: string, aiMessageIndex: number) => {
       }
 
       isGenerating.value = false
+      const wasCodeGenerating = isCodeGenerating.value
+
+      isCodeGenerating.value = false
+      isChatting.value = false
+
       eventSource?.close()
 
       // 延迟刷新预览，确保后端构建文件已完全写入
-      setTimeout(async () => {
-        await fetchAppInfo()
-        updatePreview()
-      }, 1000)
+      if (wasCodeGenerating) {
+        console.log('代码生成完成，刷新预览')
+        setTimeout(async () => {
+          await fetchAppInfo()
+          updatePreview()
+        }, 1000)
+      } else {
+        console.log('普通聊天完成，不刷新预览')
+      }
     })
 
     // 处理business-error事件（后端限流等错误）
@@ -748,17 +789,16 @@ const generateCode = async (userMessage: string, aiMessageIndex: number) => {
       }
     })
 
-
     // 处理错误
     eventSource.onerror = function () {
       if (streamCompleted || !isGenerating.value) return
-      
+
       // 检查是否是正常的连接关闭 (某些浏览器/服务端实现可能会触发这个)
       if (eventSource?.readyState === EventSource.CONNECTING) {
         // 视为连接中断或结束
         streamCompleted = true
         isGenerating.value = false
-        
+
         const aiMessage = messages.value[aiMessageIndex]
         if (aiMessage) aiMessage.loading = false
 
@@ -789,7 +829,10 @@ const handleError = (error: unknown, aiMessageIndex: number) => {
     aiMessage.loading = false
   }
   message.error('生成失败，请重试')
+  // 重置所有状态
   isGenerating.value = false
+  isCodeGenerating.value = false
+  isChatting.value = false
 }
 
 // 更新预览
@@ -802,55 +845,83 @@ const updatePreview = () => {
   }
 }
 
-// 滚动到底部
+// 滚动到底部 (旧版，保留用于普通聊天)
 const scrollToBottom = () => {
   if (messagesContainer.value) {
     messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
   }
 }
 
+// === 回到底部按钮逻辑 ===
+const showScrollBottomBtn = ref(false)
+
+// 监听滚动事件
+const handleScroll = () => {
+  const el = messagesContainer.value
+  if (!el) return
+  const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+  showScrollBottomBtn.value = distanceToBottom > 150
+}
+
+// 平滑滚动到底部（点击按钮时调用）
+const scrollToBottomSmooth = () => {
+  const el = messagesContainer.value
+  if (el) {
+    el.scrollTo({
+      top: el.scrollHeight,
+      behavior: 'smooth',
+    })
+  }
+}
+
 // 切换文件
 const switchFile = (id: string) => {
-  activeFileId.value = id;
-  const file = files.value.find((f) => f.id === id);
+  activeFileId.value = id
+  const file = files.value.find((f) => f.id === id)
   if (file) {
     if (!models.has(id)) {
-      const model = monaco.editor.createModel(
-        file.value,
-        getLanguageByExtension(file.name)
-      );
-      models.set(id, model);
+      const model = monaco.editor.createModel(file.value, getLanguageByExtension(file.name))
+      models.set(id, model)
     }
   }
 
-  const model = models.get(id);
+  const model = models.get(id)
 
   // 设置编辑器内容（v-model）
-  code.value = model.getValue();
-  language.value = model.getLanguageId();
+  code.value = model.getValue()
+  language.value = model.getLanguageId()
 }
 
 // 当切换文件,需要更改代码编辑器的内容
 const onCodeChange = (newVal: any) => {
-  const model = models.get(activeFileId.value);
+  const model = models.get(activeFileId.value)
   if (model && newVal !== model.getValue()) {
-    model.setValue(newVal);
+    model.setValue(newVal)
   }
 }
 
 // 获取文件扩展名,用于高亮显示
 const getLanguageByExtension = (name: string) => {
-  const ext = name.split(".").pop();
+  const ext = name.split('.').pop()
   switch (ext) {
-    case "js": return "javascript";
-    case "ts": return "typescript";
-    case "vue": return "vue";
-    case "json": return "json";
-    case "html": return "html";
-    case "css": return "css";
-    case "scss": return "scss";
-    case "md": return "markdown";
-    default: return "plaintext";
+    case 'js':
+      return 'javascript'
+    case 'ts':
+      return 'typescript'
+    case 'vue':
+      return 'vue'
+    case 'json':
+      return 'json'
+    case 'html':
+      return 'html'
+    case 'css':
+      return 'css'
+    case 'scss':
+      return 'scss'
+    case 'md':
+      return 'markdown'
+    default:
+      return 'plaintext'
   }
 }
 
@@ -879,7 +950,7 @@ const deployApp = async () => {
         }
         break
       case 1:
-        message.info("应用部署下线待实现")
+        message.info('应用部署下线待实现')
         break
     }
   } catch (error) {
@@ -904,17 +975,16 @@ const exportToMarkdown = async () => {
     })
 
     if (res.data.code === 0 && res.data.data) {
+      const markdown = res.data.data
+      const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
 
-      const markdown = res.data.data;
-      const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `chat-history-${appId.value}.md`
+      link.click()
 
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `chat-history-${appId.value}.md`;
-      link.click();
-
-      URL.revokeObjectURL(url);
+      URL.revokeObjectURL(url)
       message.success('导出成功')
     } else {
       message.error('导出失败：' + res.data.message)
@@ -992,7 +1062,6 @@ const refreshPreview = () => {
   }
 }
 
-
 // 下载相关
 const downloading = ref(false)
 
@@ -1033,8 +1102,6 @@ const downloadApp = async () => {
     downloading.value = false
   }
 }
-
-
 
 // 初始化页面
 const initPage = async () => {
@@ -1094,7 +1161,6 @@ const getInputPlaceholder = () => {
   return '请描述你想生成的网站，越详细效果越好哦'
 }
 
-
 // 页面加载时初始化
 const handleIframeMessage = (event: MessageEvent) => {
   visualEditor.handleIframeMessage(event)
@@ -1128,8 +1194,6 @@ onUnmounted(() => {
   align-items: center;
   padding: 12px 24px;
   background: #ffffff;
-  /* border-bottom: 1px solid #e8e8e8;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06); */
   z-index: 100;
 }
 
@@ -1174,7 +1238,6 @@ onUnmounted(() => {
   display: flex;
   background-color: #f5f5f5;
   border-radius: 10px;
-  /* gap: 8px; */
 }
 
 .tab-button {
@@ -1188,8 +1251,6 @@ onUnmounted(() => {
 
 .action-buttons {
   display: flex;
-  /* gap: 8px;
-  margin-left: 16px; */
   padding-left: 16px;
   border-left: 1px solid #e8e8e8;
 }
@@ -1236,13 +1297,12 @@ onUnmounted(() => {
 .main-content {
   flex: 1;
   display: flex;
-  /* gap: 16px; */
-  /* padding: 16px; */
   overflow: hidden;
 }
 
 /* 左侧对话区域 */
 .chat-section {
+  position: relative;
   flex: 2;
   display: flex;
   flex-direction: column;
@@ -1252,15 +1312,85 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
+/* === 回到底部按钮 === */
+.scroll-bottom-btn {
+  position: absolute;
+  bottom: 160px;
+  /* 位于输入框上方 */
+  right: 24px;
+  width: 40px;
+  height: 40px;
+  background-color: #fff;
+  border: 1px solid #e8e8e8;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  z-index: 10;
+  color: #666;
+  transition: all 0.3s;
+}
+
+.scroll-bottom-btn:hover {
+  background-color: #1890ff;
+  color: white;
+  border-color: #1890ff;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(24, 144, 255, 0.2);
+}
+
+/* 新消息提示气泡 */
+.new-msg-tip {
+  position: absolute;
+  top: -25px;
+  background: #1890ff;
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.new-msg-tip::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 4px solid #1890ff;
+}
+
+/* Vue 过渡动画 */
+.fade-enter-active,
+.fade-leave-active {
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+/* === 消息容器优化 === */
 .messages-container {
   flex: 1;
-  padding: 16px;
+  padding: 24px;
   overflow-y: auto;
   scroll-behavior: smooth;
+  background-color: #f8f9fa;
+  /* 更柔和的灰背景 */
 }
 
 .message-item {
-  margin-bottom: 12px;
+  margin-bottom: 24px;
 }
 
 .user-message {
@@ -1278,26 +1408,45 @@ onUnmounted(() => {
 }
 
 .message-content {
-  max-width: 70%;
+  max-width: 80%;
   padding: 12px 16px;
-  border-radius: 12px;
-  line-height: 1.5;
   word-wrap: break-word;
 }
 
+/* 用户气泡优化 */
 .user-message .message-content {
-  background: #1890ff;
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
   color: white;
+  /* 非对称圆角 */
+  border-radius: 16px 16px 4px 16px;
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.2);
+  font-size: 14px;
+  line-height: 1.6;
 }
 
+/* AI 气泡优化 */
 .ai-message .message-content {
-  background: #f5f5f5;
-  color: #1a1a1a;
-  padding: 8px 12px;
+  background: #ffffff;
+  color: #333;
+  /* 非对称圆角 */
+  border-radius: 16px 16px 16px 4px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  padding: 16px 20px;
+  font-size: 15px;
+  line-height: 1.7;
 }
 
+/* 头像微调 */
 .message-avatar {
   flex-shrink: 0;
+}
+
+.message-avatar :deep(.ant-avatar) {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  border: 2px solid white;
+  height: 48px;
+  width: 48px;
 }
 
 .loading-indicator {
@@ -1307,29 +1456,38 @@ onUnmounted(() => {
   color: #666;
 }
 
-/* 思考过程容器 */
+/* === 思考过程容器优化 === */
 .workflow-box {
-  margin-bottom: 12px;
-  border: 1px solid #e5e7eb;
+  margin-bottom: 16px;
+  border: none;
   border-radius: 8px;
-  background-color: #f9fafb;
+  background-color: #f7f7f8;
   overflow: hidden;
   font-size: 13px;
+  transition: all 0.3s;
 }
 
 .workflow-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
+  padding: 10px 14px;
   cursor: pointer;
-  background: #f3f4f6;
-  color: #374151;
+  background: transparent;
+  color: #666;
   user-select: none;
+  border-bottom: 1px solid transparent;
   transition: background 0.2s;
 }
+
 .workflow-header:hover {
-  background: #e5e7eb;
+  background: rgba(0, 0, 0, 0.02);
+  color: #333;
+}
+
+/* 展开时的分割线 */
+.workflow-box:has(.workflow-body) .workflow-header {
+  border-bottom: 1px solid #e5e5e5;
 }
 
 .header-left {
@@ -1340,6 +1498,7 @@ onUnmounted(() => {
 .status-text {
   font-weight: 500;
 }
+
 .step-count {
   font-size: 12px;
   color: #9ca3af;
@@ -1350,14 +1509,14 @@ onUnmounted(() => {
   transition: transform 0.2s;
   color: #6b7280;
 }
+
 .arrow-icon.expanded {
   transform: rotate(180deg);
 }
 
 .workflow-body {
-  padding: 12px;
-  background: #fff;
-  border-top: 1px solid #e5e7eb;
+  padding: 16px;
+  background: #fcfcfc;
 }
 
 .step-item {
@@ -1365,6 +1524,7 @@ onUnmounted(() => {
   position: relative;
   padding-bottom: 16px;
 }
+
 .step-item:last-child {
   padding-bottom: 0;
 }
@@ -1379,33 +1539,51 @@ onUnmounted(() => {
 }
 
 .step-dot {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  background: #d1d5db; /* 默认灰色 */
+  background: #d1d5db;
   z-index: 2;
-  margin-top: 4px;
+  margin-top: 3px;
+  box-shadow: 0 0 0 2px #fff;
 }
-.step-dot.processing { background: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.2); }
-.step-dot.finish { background: #10b981; }
-.step-dot.error { background: #ef4444; }
-.step-dot.reasoning { background: #8b5cf6; } /* 紫色表示思考 */
+
+.step-dot.processing {
+  background: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.step-dot.finish {
+  background: #10b981;
+}
+
+.step-dot.error {
+  background: #ef4444;
+}
+
+.step-dot.reasoning {
+  background: #8b5cf6;
+}
 
 .step-line {
   position: absolute;
   top: 12px;
   bottom: -20px;
-  width: 1px;
-  background: #e5e7eb;
+  width: 2px;
+  background: #e0e0e0;
   z-index: 1;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .step-content {
   flex: 1;
 }
+
 .step-title {
   color: #4b5563;
 }
+
 .reasoning-text {
   margin-top: 4px;
   padding: 8px;
@@ -1417,14 +1595,16 @@ onUnmounted(() => {
   white-space: pre-wrap;
 }
 
-/* 输入区域 */
+/* === 输入框区域悬浮优化 === */
 .input-container {
-  padding: 16px;
-  background: white;
+  padding: 20px 24px 24px;
+  background: transparent;
 }
 
 .input-wrapper {
   position: relative;
+  max-width: 900px;
+  margin: 0 auto;
 }
 
 .input-wrapper .ant-input {
@@ -1432,29 +1612,53 @@ onUnmounted(() => {
 }
 
 .chat-content {
-  background-color: #f5f5f5;
-  border-color: transparent;
-  border-radius: 15px;
+  background-color: #ffffff;
+  /* 悬浮阴影 */
+  box-shadow:
+    0 6px 24px rgba(0, 0, 0, 0.08),
+    0 0 1px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  border-radius: 16px;
+  padding: 16px;
+  padding-right: 60px;
   resize: none;
   width: 100%;
   height: 120px;
   min-height: 120px;
   max-height: 120px;
   overflow: auto;
+  transition: all 0.3s ease;
+  font-size: 15px;
 }
 
+.chat-content:focus,
 .chat-content:hover {
-  border-color: transparent;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  border-color: rgba(24, 144, 255, 0.3);
 }
 
 .input-actions {
   position: absolute;
-  bottom: 8px;
-  right: 8px;
+  bottom: 12px;
+  right: 12px;
 }
 
 .sent-message-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-color: transparent;
+  box-shadow: 0 4px 10px rgba(24, 144, 255, 0.3);
+  transition: all 0.3s;
+}
+
+.sent-message-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(24, 144, 255, 0.4);
 }
 
 /* 右侧内容展示区域 */
@@ -1463,10 +1667,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   background: white;
-
-  /* box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08); */
   padding: 16px;
-
   overflow: hidden;
 }
 
@@ -1530,8 +1731,10 @@ onUnmounted(() => {
 
 /* 代码标签内容 */
 .code-content {
-  padding: 16px;
-  /* background: #fafafa; */
+  padding: 0;
+  /* 去掉 padding，配合新 Tabs 样式 */
+  display: flex;
+  flex-direction: column;
 }
 
 .code-placeholder {
@@ -1563,29 +1766,57 @@ onUnmounted(() => {
   height: 100%;
 }
 
+/* === Tabs 优化 === */
 .tabs {
+  background: #f0f2f5;
+  padding: 0;
+  gap: 1px;
+  border-bottom: 1px solid #e8e8e8;
   display: flex;
-  padding: 6px;
   user-select: none;
 }
 
 .tab {
-  padding: 6px 14px;
-  margin-right: 6px;
-  color: #94979D;
-  border-radius: 4px 4px 0 0;
+  padding: 10px 20px;
+  background: #e6e8eb;
+  color: #666;
+  border-radius: 0;
+  font-size: 12px;
+  transition: all 0.2s;
+  border-right: 1px solid rgba(0, 0, 0, 0.05);
   cursor: pointer;
-  font-size: 13px;
+  margin-right: 0;
+}
+
+.tab:hover {
+  background: #f5f5f5;
 }
 
 .tab.active {
-  color: #000000;
-  background: #f4f5f7;
-  border-radius: 5px;
-  /* border-bottom: 2px solid #007acc; */
+  background: #ffffff;
+  color: #1890ff;
+  border-top: 2px solid #1890ff;
+  font-weight: 500;
 }
 
+/* === 全局滚动条美化 === */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
 
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d9d9d9;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #bfbfbf;
+}
 
 /* 响应式设计 */
 @media (max-width: 1024px) {

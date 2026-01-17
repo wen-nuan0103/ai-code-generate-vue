@@ -2,9 +2,9 @@
 /* eslint-disable */
 import request from '@/request'
 
-/** 此处后端没有提供注释 POST /user/add */
+/** 此处后端没有提供注释 POST /user/admin/add */
 export async function addUser(body: API.UserAddRequest, options?: { [key: string]: any }) {
-  return request<API.BaseResponseLong>('/user/add', {
+  return request<API.BaseResponseLong>('/user/admin/add', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -14,9 +14,9 @@ export async function addUser(body: API.UserAddRequest, options?: { [key: string
   })
 }
 
-/** 此处后端没有提供注释 POST /user/delete */
+/** 此处后端没有提供注释 POST /user/admin/delete */
 export async function deleteUser(body: API.DeleteRequest, options?: { [key: string]: any }) {
-  return request<API.BaseResponseBoolean>('/user/delete', {
+  return request<API.BaseResponseBoolean>('/user/admin/delete', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -26,13 +26,13 @@ export async function deleteUser(body: API.DeleteRequest, options?: { [key: stri
   })
 }
 
-/** 此处后端没有提供注释 GET /user/get */
+/** 此处后端没有提供注释 GET /user/admin/get */
 export async function getUserById(
   // 叠加生成的Param类型 (非body参数swagger默认没有生成对象)
   params: API.getUserByIdParams,
   options?: { [key: string]: any }
 ) {
-  return request<API.BaseResponseUser>('/user/get', {
+  return request<API.BaseResponseUser>('/user/admin/get', {
     method: 'GET',
     params: {
       ...params,
@@ -112,8 +112,26 @@ export async function register(body: API.UserRegisterRequest, options?: { [key: 
 }
 
 /** 此处后端没有提供注释 POST /user/update */
-export async function updateUser(body: API.UserUpdateRequest, options?: { [key: string]: any }) {
+export async function updateUser(
+  body: API.UserUpdateByAdminRequest,
+  options?: { [key: string]: any }
+) {
   return request<API.BaseResponseBoolean>('/user/update', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    data: body,
+    ...(options || {}),
+  })
+}
+
+/** 此处后端没有提供注释 POST /user/updateInfo */
+export async function updateUserInfo(
+  body: API.UserUpdateRequest,
+  options?: { [key: string]: any }
+) {
+  return request<API.BaseResponseBoolean>('/user/updateInfo', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

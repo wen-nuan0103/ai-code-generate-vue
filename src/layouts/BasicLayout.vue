@@ -8,22 +8,24 @@ const route = useRoute()
 
 // 根据路由 meta 判断是否隐藏布局
 const hideLayout = computed(() => route.meta.hideLayout)
+const hideFooter = computed(() => route.meta.hideFooter)
+const hideHeader = computed(() => route.meta.hideHeader)
 </script>
 
 <template>
   <a-layout class="basic-layout">
     <!-- 顶部导航栏 -->
-    <GlobalHeader v-if="!hideLayout" />
+    <GlobalHeader v-if="!hideLayout && !hideHeader" />
 
     <!-- 中间内容区域 -->
-    <a-layout-content class="content" :class="{ 'no-padding': hideLayout }">
+    <a-layout-content class="content" :class="{ 'no-padding': hideLayout || hideHeader }">
       <div class="content-wrapper" :class="{ 'full-height': hideLayout }">
         <RouterView />
       </div>
     </a-layout-content>
 
     <!-- 底部版权信息 -->
-    <GlobalFooter v-if="!hideLayout" />
+    <GlobalFooter v-if="!hideLayout && !hideFooter" />
   </a-layout>
 </template>
 
@@ -38,11 +40,13 @@ const hideLayout = computed(() => route.meta.hideLayout)
   padding: 0;
   background: none;
   margin: 0;
-  padding-top: 64px; /* 为固定的导航头留出空间 */
+  padding-top: 64px;
+  /* 为固定的导航头留出空间 */
 }
 
 .content.no-padding {
-  padding-top: 0; /* 隐藏布局时不需要为导航栏留空间 */
+  padding-top: 0;
+  /* 隐藏布局时不需要为导航栏留空间 */
 }
 
 .content-wrapper {
@@ -50,7 +54,8 @@ const hideLayout = computed(() => route.meta.hideLayout)
 }
 
 .content-wrapper.full-height {
-  min-height: 100vh; /* 隐藏布局时占据全屏 */
+  min-height: 100vh;
+  /* 隐藏布局时占据全屏 */
   height: 100vh;
 }
 
@@ -61,7 +66,8 @@ const hideLayout = computed(() => route.meta.hideLayout)
   }
 
   .content-wrapper.full-height {
-    padding: 0; /* 全屏模式不需要内边距 */
+    padding: 0;
+    /* 全屏模式不需要内边距 */
   }
 }
 
@@ -71,7 +77,8 @@ const hideLayout = computed(() => route.meta.hideLayout)
   }
 
   .content-wrapper.full-height {
-    padding: 0; /* 全屏模式不需要内边距 */
+    padding: 0;
+    /* 全屏模式不需要内边距 */
   }
 }
 </style>

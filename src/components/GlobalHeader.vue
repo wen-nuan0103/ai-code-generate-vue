@@ -2,7 +2,7 @@
 import { useUserStore } from '@/stores/user'
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { LogoutOutlined } from '@ant-design/icons-vue'
+import { LogoutOutlined,UserOutlined} from '@ant-design/icons-vue'
 import { logout } from '@/api/userController'
 import { message } from 'ant-design-vue'
 import checkAccess from '@/access/checkAccess'
@@ -15,7 +15,6 @@ const menuItems = ref([
 
 const router = useRouter()
 const allRoutes = router.getRoutes()
-// console.log(allRoutes);
 const userStore = useUserStore()
 
 // 滚动状态
@@ -48,7 +47,6 @@ const items = computed(() => {
     if (item.meta?.hideInMenu) {
       return false
     }
-    // 根据权限过滤菜单，有权限则返回 true，则保留该菜单
     return checkAccess(userStore.user, item.meta?.access as string)
   })
 })
@@ -90,11 +88,15 @@ const handleLogout = async () => {
           <div v-if="userStore.user.id">
             <a-dropdown>
               <a-space class="user-info">
-                <a-avatar :src="userStore.user.avatar" style="width: 48px;height: 48px;"/>
-                <!-- <span class="user-name">{{ userStore.user.userName ?? '无名' }}</span> -->
+                <a-avatar :src="userStore.user.avatar" style="width: 48px;height: 48px;" />
+                <span class="user-name">{{ userStore.user.userName ?? '无名' }}</span>
               </a-space>
               <template #overlay>
                 <a-menu>
+                  <a-menu-item @click="router.push('/user/profile')">
+                    <UserOutlined />
+                    个人中心
+                  </a-menu-item>
                   <a-menu-item @click="handleLogout">
                     <LogoutOutlined />
                     退出登录
@@ -107,7 +109,6 @@ const handleLogout = async () => {
             <button class="login-btn" @click="router.push('/user/login')">
               <span>登录</span>
             </button>
-            <!-- <a-button type="primary" href="/user/login" class="login-btn">登录</a-button> -->
           </div>
         </div>
       </div>
@@ -136,7 +137,7 @@ const handleLogout = async () => {
   box-shadow: 0 2px 20px rgba(0, 0, 0, 0.08);
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
 } */
- 
+
 
 .header-content {
   max-width: 1400px;

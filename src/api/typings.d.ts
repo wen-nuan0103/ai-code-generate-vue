@@ -1,4 +1,10 @@
 declare namespace API {
+  type AdminChargeRequest = {
+    userId?: number
+    amount?: number
+    remark?: string
+  }
+
   type AppAddRequest = {
     initPrompt?: string
   }
@@ -15,7 +21,7 @@ declare namespace API {
   }
 
   type AppQueryRequest = {
-    pageNum?: number
+    current?: number
     pageSize?: number
     sortField?: string
     sortOrder?: string
@@ -95,6 +101,12 @@ declare namespace API {
     message?: string
   }
 
+  type BaseResponsePagePointsVO = {
+    code?: number
+    data?: PagePointsVO
+    message?: string
+  }
+
   type BaseResponsePageUserVO = {
     code?: number
     data?: PageUserVO
@@ -133,7 +145,7 @@ declare namespace API {
   }
 
   type ChatHistoryQueryRequest = {
-    pageNum?: number
+    current?: number
     pageSize?: number
     sortField?: string
     sortOrder?: string
@@ -187,10 +199,17 @@ declare namespace API {
   type LoginUserVO = {
     id?: number
     userAccount?: string
+    phone?: string
     userName?: string
     avatar?: string
     profile?: string
     role?: string
+    vipExpireTime?: string
+    vipCode?: string
+    vipNumber?: number
+    points?: number
+    shareCode?: string
+    inviteUser?: number
     createTime?: string
     updateTime?: string
   }
@@ -213,6 +232,15 @@ declare namespace API {
     optimizeCountQuery?: boolean
   }
 
+  type PagePointsVO = {
+    records?: PointsVO[]
+    pageNumber?: number
+    pageSize?: number
+    totalPage?: number
+    totalRow?: number
+    optimizeCountQuery?: boolean
+  }
+
   type PageUserVO = {
     records?: UserVO[]
     pageNumber?: number
@@ -220,6 +248,33 @@ declare namespace API {
     totalPage?: number
     totalRow?: number
     optimizeCountQuery?: boolean
+  }
+
+  type PointsQueryRequest = {
+    current?: number
+    pageSize?: number
+    sortField?: string
+    sortOrder?: string
+    userAccount?: string
+    bizNo?: string
+    type?: number
+    createTimeStart?: string
+    createTimeEnd?: string
+  }
+
+  type PointsVO = {
+    id?: number
+    userId?: number
+    amount?: number
+    type?: number
+    currentPoints?: number
+    bizNo?: string
+    refId?: number
+    remark?: string
+    createTime?: string
+    userAccount?: string
+    userName?: string
+    avatar?: string
   }
 
   type ServerSentEventString = true
@@ -231,6 +286,7 @@ declare namespace API {
   type User = {
     id?: number
     userAccount?: string
+    phone?: string
     password?: string
     userName?: string
     avatar?: string
@@ -239,11 +295,13 @@ declare namespace API {
     vipExpireTime?: string
     vipCode?: string
     vipNumber?: number
+    points?: number
     shareCode?: string
     inviteUser?: number
     editTime?: string
     createTime?: string
     updateTime?: string
+    userStatus?: number
     isDelete?: number
   }
 
@@ -258,10 +316,11 @@ declare namespace API {
   type UserLoginRequest = {
     userAccount?: string
     userPassword?: string
+    isAdminLogin?: boolean
   }
 
   type UserQueryRequest = {
-    pageNum?: number
+    current?: number
     pageSize?: number
     sortField?: string
     sortOrder?: string
@@ -270,12 +329,23 @@ declare namespace API {
     userAccount?: string
     userProfile?: string
     role?: string
+    userStatus?: number
   }
 
   type UserRegisterRequest = {
     userAccount?: string
     userPassword?: string
     checkPassword?: string
+    inviteCode?: string
+  }
+
+  type UserUpdateByAdminRequest = {
+    id?: number
+    userName?: string
+    avatar?: string
+    profile?: string
+    role?: string
+    userStatus?: number
   }
 
   type UserUpdateRequest = {
@@ -283,7 +353,6 @@ declare namespace API {
     userName?: string
     avatar?: string
     profile?: string
-    role?: string
   }
 
   type UserVO = {
@@ -293,6 +362,8 @@ declare namespace API {
     avatar?: string
     profile?: string
     role?: string
+    isVip?: boolean
+    userStatus?: number
     createTime?: string
   }
 }
